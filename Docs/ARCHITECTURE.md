@@ -58,12 +58,14 @@
 
 ### 2.3 Data Layer
 - PostgreSQL relational storage for:
-  - Users, roles, profiles
+  - RBAC core: users, roles, user_roles
+  - Users and profiles
   - Vehicles and history
   - Garages/vendors and verification
   - Quotes/bookings/payments
   - Reviews/complaints/trust metrics
   - Marketplace products/orders
+  - Feedback, smsEvents, authSessions
   - Dynamic app content/config and workflow metadata
 
 ### 2.4 Integration Layer
@@ -105,3 +107,4 @@
 - Deterministic state transitions for booking/payment/review eligibility.
 - Content-first rendering: app title, labels, forms, question banks, and policy links are loaded from PostgreSQL-backed content APIs.
 - Shadcn theme governance: colors, radii, typography, and semantic tokens are defined in global theme files and consumed uniformly.
+- Shadcn component governance: standard UI components (sidebar, toast, footer, button, input, dialog, tabs, card, badge, skeleton, etc.) must come from Shadcn; do not hand-build equivalent primitives.

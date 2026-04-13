@@ -3,6 +3,8 @@
 
 ## 1. Data Contract (Logical Entities)
 - `User`: identity, role, auth source, profile basics.
+- `Role`: centralized role definitions.
+- `UserRole`: user-to-role mapping.
 - `Vehicle`: vehicle core attributes, optional identifiers, ownership.
 - `VehicleHistory`: repairs, services, pricing, timeline.
 - `Garage`: business profile, verification, specializations, availability.
@@ -14,6 +16,9 @@
 - `Review`: verified post-booking feedback.
 - `Complaint`: service quality or overcharging report.
 - `Part` / `Order`: marketplace catalog and purchase flow.
+- `Feedback`: customer-only feedback collection.
+- `SmsEvent`: abstract SMS event logging.
+- `AuthSession`: refresh token/session lifecycle store.
 - `AppConfig`: global runtime configuration (app name, branding, legal links, support metadata).
 - `UiContent`: key-value content catalog for all user-visible copy by locale/platform.
 - `FeatureFlag`: runtime toggles for feature enablement and role visibility.
@@ -30,6 +35,11 @@
 - Garage/vendor operations are enabled only after admin approval.
 
 ## 3. Access Rules (RBAC)
+- RBAC storage model is mandatory:
+  - `users`
+  - `roles`
+  - `user_roles`
+- Role mapping is resolved through `user_roles`, not a single inline role field.
 - Customer:
   - Can manage own profile/vehicles/issues/bookings/payments/reviews.
   - Cannot approve garages/vendors or access platform analytics.
@@ -125,6 +135,19 @@ Auth note:
 - `GET /notifications`
 - `PATCH /notifications/{id}/read`
 
+### 4.11 RBAC and Sessions
+- `GET /roles`
+- `POST /user-roles`
+- `GET /users/{userId}/roles`
+- `POST /auth/sessions/refresh`
+- `POST /auth/sessions/revoke`
+
+### 4.12 Feedback and SMS Event Logging
+- `POST /feedback` (customer-only)
+- `GET /feedback/me`
+- `POST /sms-events` (system/internal)
+- `GET /sms-events` (admin/internal)
+
 ## 5. Contract Rules
 - API security default: every endpoint requires a valid authentication token unless explicitly marked public.
 - Public endpoint scope is limited to login/register entry endpoints in section 4.1.
@@ -135,3 +158,5 @@ Auth note:
 - DIY instructions must be blocked for high-risk diagnosis categories.
 - Frontend must not ship hardcoded product copy for runtime screens; it must consume `/runtime/*` APIs.
 - Seed JSON files are import-only artifacts; runtime execution must query PostgreSQL tables.
+- Enforce unique composite mapping on (`userId`, `roleId`) in `user_roles`.
+- `feedback` creation is restricted to customer role.

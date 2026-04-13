@@ -24,6 +24,8 @@ Phase-1 note:
 - `FR-CFG-006`: Seed JSON files shall only initialize PostgreSQL tables; runtime reads must query PostgreSQL.
 - `FR-UI-001`: Shadcn UI theme tokens (colors, typography, spacing/radius semantics) shall be centrally defined at global level and reused across all screens.
 - `FR-UI-002`: Components shall consume global theme tokens; no page-level hardcoded color palette overrides for core branding.
+- `FR-UI-003`: Standard UI components (sidebar, toast, footer, button, input, dialog, tabs, card, badge, skeleton, etc.) shall use Shadcn implementations only.
+- `FR-UI-004`: Manually coded duplicate UI primitives are not allowed unless formally approved as an exception.
 
 Acceptance checks:
 - Changing app name in DB updates both web and mobile without code changes.
@@ -36,6 +38,7 @@ Acceptance checks:
 - `FR-AUTH-003`: Customer onboarding shall capture name and required basic details.
 - `FR-AUTH-004`: System shall enforce role-based access controls across all protected functions.
 - `FR-AUTH-005`: API protection shall be token-based by default; only login/register entry endpoints are public.
+- `FR-AUTH-006`: Session lifecycle shall be managed via `authSessions` (refresh, revoke, expiry, audit).
 
 Acceptance checks:
 - User can complete OTP flow and access customer area.
@@ -139,6 +142,22 @@ Acceptance checks:
 
 Acceptance checks:
 - Admin-only actions are denied to non-admin roles.
+
+### 3.10 RBAC Model (Authoritative)
+- `FR-RBAC-001`: RBAC persistence shall use `users`, `roles`, and `user_roles`.
+- `FR-RBAC-002`: Roles shall be centrally defined in `roles` and mapped via `user_roles`.
+- `FR-RBAC-003`: Composite uniqueness on (`userId`, `roleId`) shall prevent duplicate mappings.
+- `FR-RBAC-004`: Effective authorization shall resolve from mapped roles, not hardcoded role flags.
+
+Acceptance checks:
+- User with no mapped role is denied protected business actions.
+- Duplicate `user_roles` mapping attempt is rejected.
+
+### 3.11 Additional Business Collections
+- `FR-BIZ-001`: `orders` remains a business collection in active scope.
+- `FR-BIZ-002`: `feedback` is customer-only.
+- `FR-BIZ-003`: `smsEvents` captures abstract SMS delivery/verification logs.
+- `FR-BIZ-004`: `authSessions` governs refresh token/session lifecycle.
 
 ## 4. Non-Functional Requirements
 - US launch readiness.

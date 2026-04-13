@@ -81,6 +81,8 @@ No user-visible or rule-driving content should be hardcoded in frontend or backe
 - UI is built with Shadcn and a global theme contract.
 - Colors, semantic tokens, radius, and typography are defined once in global theme files and applied app-wide.
 - No local component-level hardcoded brand palette values for core UI surfaces.
+- Standard UI primitives/layout components must use Shadcn components only (sidebar, toast, footer, button, input, dialog, tabs, card, badge, skeleton, etc.).
+- Manual recreation of these components is disallowed by default.
 
 ## 5. Hybrid AI Execution Model
 Primary flow:
@@ -146,6 +148,20 @@ Quotes are structured submissions from garages, not AI-generated values:
 - Phase 1 build targets roles `admin`, `user`, `garage` for active workflow delivery.
 - Vendor remains a product role in PRD and can be enabled in a later implementation phase.
 - Phase 1 data/backend implementation is raw PostgreSQL + explicit RBAC.
+- RBAC storage/authorization uses canonical role codes defined in the RBAC contract section.
+
+## 9B. RBAC Storage Contract (Locked)
+- RBAC must be modeled with:
+  - `users`
+  - `roles`
+  - `user_roles`
+- Role assignment is resolved through `user_roles` mapping.
+- Unique (`userId`, `roleId`) mapping must be enforced.
+- Business collections in active scope include:
+  - `orders`
+  - `feedback` (customer-only)
+  - `smsEvents` (abstract logging)
+  - `authSessions` (refresh token/session lifecycle)
 
 ## 10. Rationale
 - Aligns with PRD needs: guided diagnosis, quote comparison, booking completion.

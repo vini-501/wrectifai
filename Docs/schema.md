@@ -4,9 +4,8 @@
 ## 1. Conventions
 - Primary key type: UUID (unless integration requires provider-native IDs).
 - Timestamps: `created_at`, `updated_at` in UTC.
-- Role enum (product): `user`, `garage`, `vendor`, `admin`.
-- Role enum (phase-1 implementation in task.md): `user`, `garage`, `admin`.
 - Status enums are stored as constrained text/enums.
+- RBAC is table-driven via `roles` and `user_roles` (not a hardcoded role enum on `users`).
 
 ## 2. Entities and Field Definitions
 
@@ -89,7 +88,6 @@ Constraints:
 
 ### 2.1 users
 - `id`: UUID, PK, not null
-- `role`: enum(role), not null
 - `phone`: varchar, nullable (required for OTP users)
 - `email`: varchar, nullable
 - `full_name`: varchar, nullable (phase-1 compatibility with `task.md`)
@@ -102,6 +100,26 @@ Constraints:
 Constraints:
 - Unique (`phone`) when present.
 - Unique (`email`) when present.
+
+### 2.1A roles
+- `id`: UUID, PK, not null
+- `code`: varchar, not null
+- `name`: varchar, not null
+- `created_at`: timestamp, not null
+- `updated_at`: timestamp, not null
+
+Constraints:
+- Unique (`code`)
+
+### 2.1B user_roles
+- `id`: UUID, PK, not null
+- `user_id`: UUID, FK -> users.id, not null
+- `role_id`: UUID, FK -> roles.id, not null
+- `created_at`: timestamp, not null
+- `updated_at`: timestamp, not null
+
+Constraints:
+- Unique (`user_id`, `role_id`)
 
 ### 2.2 profiles
 - `id`: UUID, unique, nullable (phase-1 compatibility with `task.md` shape)
@@ -289,6 +307,7 @@ Constraints:
 - `updated_at`: timestamp, not null
 
 ## 3. Core Relationship Summary
+- `users N:M roles` via `user_roles`
 - `users 1:N vehicles`
 - `vehicles 1:N vehicle_repair_history`
 - `users 1:1 garages` (for garage owners)

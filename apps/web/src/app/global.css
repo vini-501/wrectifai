@@ -3,32 +3,67 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
-  --primary: 221.2 83.2% 53.3%;
+  /* Core brand palette from DESIGN.md */
+  --background: 220 100% 98%; /* #f7f9ff */
+  --foreground: 209 61% 11%; /* #0b1d2d */
+  --card: 0 0% 100%;
+  --card-foreground: 209 61% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 209 61% 11%;
+  --primary: 211 73% 58%; /* #4894e2 precision blue */
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --radius: 0.5rem;
+  --secondary: 218 100% 97%; /* #eef4ff */
+  --secondary-foreground: 213 24% 29%; /* #38485a */
+  --muted: 218 100% 97%; /* tonal layer */
+  --muted-foreground: 213 18% 40%;
+  --accent: 218 100% 97%;
+  --accent-foreground: 209 61% 11%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 213 24% 29%; /* ghost border base tint */
+  --input: 218 100% 97%;
+  --ring: 211 73% 58%;
+  --radius: 0.25rem;
+
+  --sidebar: 210 100% 9%; /* #00162c deep navy */
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 213 90% 18%;
+  --sidebar-primary-foreground: 210 40% 98%;
+  --sidebar-accent: 213 90% 22%;
+  --sidebar-accent-foreground: 210 40% 96%;
+  --sidebar-border: 213 38% 30%;
+  --sidebar-ring: 211 73% 58%;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
+  --background: 214 52% 10%;
   --foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
+  --card: 214 45% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 214 45% 13%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 211 73% 58%;
+  --primary-foreground: 214 52% 10%;
+  --secondary: 213 41% 22%;
   --secondary-foreground: 210 40% 98%;
+  --muted: 213 38% 20%;
+  --muted-foreground: 215 18% 72%;
+  --accent: 213 41% 24%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 43%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 213 28% 30%;
+  --input: 213 28% 24%;
+  --ring: 211 73% 58%;
+
+  --sidebar: 210 100% 9%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 213 90% 20%;
+  --sidebar-primary-foreground: 210 40% 98%;
+  --sidebar-accent: 213 41% 24%;
+  --sidebar-accent-foreground: 210 40% 96%;
+  --sidebar-border: 213 28% 30%;
+  --sidebar-ring: 211 73% 58%;
 }
 
 * {
@@ -36,5 +71,38 @@
 }
 
 body {
-  @apply bg-background text-foreground;
+  @apply bg-background font-sans text-foreground;
+  background-image: radial-gradient(circle at top left, hsl(218 100% 99%) 0%, hsl(var(--background)) 52%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply font-display;
+  color: hsl(var(--foreground));
+}
+
+/* DESIGN.md ambient depth + glass treatment */
+.surface-low {
+  background-color: hsl(218 100% 97%); /* #eef4ff */
+}
+
+.surface-lowest {
+  background-color: hsl(0 0% 100%);
+}
+
+.glass {
+  backdrop-filter: blur(12px);
+  background: rgb(255 255 255 / 70%);
+}
+
+.shadow-ambient {
+  box-shadow: 0 10px 40px rgb(11 29 45 / 5%);
+}
+
+.ghost-border {
+  border: 1px solid rgb(56 72 90 / 15%);
 }
