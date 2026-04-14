@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicPaths = ['/auth/login', '/auth/register', '/auth/verify'];
+const publicPaths = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/vendor/register',
+  '/auth/garage/register',
+  '/auth/verify',
+];
 const rolePrefixes = ['/user', '/garage', '/vendor', '/admin'] as const;
 
 const API_BASE_URL =

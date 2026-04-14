@@ -3,7 +3,7 @@ import { AuthShell } from '@/components/auth/auth-shell';
 import { RegisterForm } from '@/components/auth/register-form';
 import { getAuthPageContent } from '@/lib/api';
 
-export default async function RegisterPage() {
+export default async function GarageRegisterPage() {
   const ui = await getAuthPageContent('register');
 
   return (
@@ -23,8 +23,8 @@ export default async function RegisterPage() {
             </Link>
           </p>
           <RegisterForm
-            roleCode="user"
-            registerPath="/auth/register"
+            roleCode="garage"
+            registerPath="/auth/garage/register"
             title={ui.form.title}
             subtitle={ui.form.subtitle}
             fullNameLabel={ui.form.fullNameLabel}

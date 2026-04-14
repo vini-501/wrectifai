@@ -1,40 +1,40 @@
 import Link from 'next/link';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { LoginForm } from '@/components/auth/login-form';
-import { getAuthRuntimeContent } from '@/lib/api';
+import { getAuthPageContent } from '@/lib/api';
 
 export default async function LoginPage() {
-  const runtime = await getAuthRuntimeContent();
+  const ui = await getAuthPageContent('login');
 
   return (
     <AuthShell
-      appName={runtime.appIdentity.name ?? 'WrectifAI'}
-      heroKicker={runtime.copy['auth.hero.kicker'] ?? 'AUTOMOTIVE INTELLIGENCE'}
-      heroTitle={
-        runtime.copy['auth.hero.title'] ?? 'Experience Surgical Precision in Car Care.'
-      }
-      heroBody={
-        runtime.copy['auth.hero.body'] ??
-        'Join the elite ecosystem of automotive specialists and enthusiasts.'
-      }
+      hideHeroOnMobile
+      appName={ui.appName}
+      authModeLabel={ui.authModeLabel}
+      heroKicker={ui.hero.kicker}
+      heroTitle={ui.hero.title}
+      heroBody={ui.hero.body}
       rightPane={
         <div>
           <p className="mb-6 text-right text-sm text-muted-foreground">
-            Need an account?{' '}
+            {ui.links.needAccountPrefix}{' '}
             <Link href="/auth/register" className="text-primary hover:underline">
-              Register
+              {ui.links.needAccountCta}
             </Link>
           </p>
           <LoginForm
-            title={runtime.copy['auth.login.title'] ?? 'Welcome Back'}
-            subtitle={
-              runtime.copy['auth.login.subtitle'] ??
-              'Login with your 10-digit phone number.'
-            }
+            title={ui.form.title}
+            subtitle={ui.form.subtitle}
+            phoneLabel={ui.form.phoneLabel}
+            phonePlaceholder={ui.form.phonePlaceholder}
+            sendOtpLabel={ui.form.sendOtpLabel}
+            sendingOtpLabel={ui.form.sendingOtpLabel}
+            invalidPhoneMessage={ui.errors.phoneInvalid}
+            sendOtpFailedMessage={ui.errors.sendOtpFailed}
+            unexpectedErrorMessage={ui.errors.unexpected}
           />
         </div>
       }
     />
   );
 }
-

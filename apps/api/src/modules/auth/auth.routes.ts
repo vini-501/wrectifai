@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { query } from '../../db/postgres';
 import {
   createOtpChallenge,
   loginWithOtp,
@@ -221,57 +220,4 @@ authRouter.get('/me', requireAuth, (req, res) => {
   return res.json({
     user: req.authUser,
   });
-});
-
-authRouter.get('/register/content', async (_req, res, next) => {
-  try {
-    const app = await query<{ value_json: { name?: string; tagline?: string } }>(
-      `SELECT value_json FROM runtime_app_config WHERE key = 'app_identity' LIMIT 1`
-    );
-    const content = await query<{ content_key: string; value_text: string }>(
-      `
-        SELECT content_key, value_text
-        FROM runtime_ui_content
-        WHERE locale = 'en-US'
-          AND content_key LIKE 'auth.%'
-      `
-    );
-    const copy = content.rows.reduce<Record<string, string>>((acc, row) => {
-      acc[row.content_key] = row.value_text;
-      return acc;
-    }, {});
-    const roleRows = await query<{ code: 'user' | 'garage' | 'vendor'; name: string }>(
-      `
-        SELECT code, name
-        FROM roles
-        WHERE code IN ('user', 'garage', 'vendor')
-        ORDER BY CASE code WHEN 'user' THEN 1 WHEN 'garage' THEN 2 WHEN 'vendor' THEN 3 ELSE 99 END
-      `
-    );
-    return res.json({
-      appIdentity: app.rows[0]?.value_json ?? { name: 'WrectifAI' },
-      copy,
-      roleOptions: roleRows.rows.map((role) => ({
-        code: role.code,
-        label: role.name,
-        description: copy[`auth.role.${role.code}.description`] ?? '',
-      })),
-      authRules: {
-        phoneDigits: 10,
-        otpDigits: 6,
-        registerRoles: ['user', 'garage', 'vendor'],
-        loginRoleSelectionAllowed: false,
-      },
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
-
-authRouter.get('/login/content', async (req, res, next) => {
-  try {
-    return res.redirect('/api/auth/register/content');
-  } catch (error) {
-    return next(error);
-  }
 });

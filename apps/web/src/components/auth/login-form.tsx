@@ -10,19 +10,45 @@ import { API_BASE_URL } from '@/lib/api';
 type LoginFormProps = {
   title: string;
   subtitle: string;
+  phoneLabel: string;
+  phonePlaceholder: string;
+  sendOtpLabel: string;
+  sendingOtpLabel: string;
+  invalidPhoneMessage: string;
+  sendOtpFailedMessage: string;
+  unexpectedErrorMessage: string;
 };
 
-export function LoginForm({ title, subtitle }: LoginFormProps) {
+export function LoginForm({
+  title,
+  subtitle,
+  phoneLabel,
+  phonePlaceholder,
+  sendOtpLabel,
+  sendingOtpLabel,
+  invalidPhoneMessage,
+  sendOtpFailedMessage,
+  unexpectedErrorMessage,
+}: LoginFormProps) {
   const router = useRouter();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string }>({});
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
+
+    const errors: { phone?: string } = {};
+
     if (!/^\d{10}$/.test(phone)) {
-      setError('Phone number must be 10 digits');
+      errors.phone = invalidPhoneMessage;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
     setLoading(true);
@@ -35,11 +61,11 @@ export function LoginForm({ title, subtitle }: LoginFormProps) {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message ?? 'Unable to send OTP');
+        throw new Error(data.message ?? sendOtpFailedMessage);
       }
       router.push(`/auth/verify?mode=login&phone=${encodeURIComponent(phone)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error');
+      setError(err instanceof Error ? err.message : unexpectedErrorMessage);
     } finally {
       setLoading(false);
     }
@@ -52,26 +78,27 @@ export function LoginForm({ title, subtitle }: LoginFormProps) {
 
       <form className="mt-8 space-y-4" onSubmit={onSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">{phoneLabel}</Label>
           <Input
             id="phone"
             type="tel"
             inputMode="numeric"
             pattern="[0-9]{10}"
             maxLength={10}
-            placeholder="9876543210"
+            placeholder={phonePlaceholder}
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            className={fieldErrors.phone ? 'border-destructive' : ''}
           />
+          {fieldErrors.phone && <p className="text-sm text-destructive">{fieldErrors.phone}</p>}
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         <Button className="h-12 w-full text-base" type="submit" disabled={loading}>
-          {loading ? 'Sending OTP...' : 'Send OTP'}
+          {loading ? sendingOtpLabel : sendOtpLabel}
         </Button>
       </form>
     </div>
   );
 }
-

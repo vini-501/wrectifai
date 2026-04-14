@@ -90,13 +90,26 @@ export function ensureDbBootstrap() {
     `);
 
     await query(`
-      CREATE TABLE IF NOT EXISTS runtime_ui_content (
-        content_key TEXT NOT NULL,
-        locale TEXT NOT NULL DEFAULT 'en-US',
-        value_text TEXT NOT NULL,
+      CREATE TABLE IF NOT EXISTS ui_content (
+        id SERIAL PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        module TEXT NOT NULL,
+        page TEXT NOT NULL,
+        locale TEXT NOT NULL,
+        version INT NOT NULL DEFAULT 1,
+        content JSONB NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        PRIMARY KEY (content_key, locale)
+        UNIQUE (tenant_id, module, page, locale)
       );
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_ui_content_lookup
+      ON ui_content (tenant_id, module, page, locale);
+    `);
+
+    await query(`
+      DROP TABLE IF EXISTS runtime_ui_content;
     `);
 
     await seedDefaults();
@@ -129,19 +142,115 @@ async function seedDefaults() {
 
   await query(
     `
-      INSERT INTO runtime_ui_content (content_key, locale, value_text)
+      INSERT INTO ui_content (tenant_id, module, page, locale, version, content)
       VALUES
-      ('auth.register.title', 'en-US', 'Create Account'),
-      ('auth.register.subtitle', 'en-US', 'Start your journey with WrectifAI precision today.'),
-      ('auth.login.title', 'en-US', 'Welcome Back'),
-      ('auth.login.subtitle', 'en-US', 'Login with your 10-digit phone number.'),
-      ('auth.hero.kicker', 'en-US', 'AUTOMOTIVE INTELLIGENCE'),
-      ('auth.hero.title', 'en-US', 'Experience Surgical Precision in Car Care.'),
-      ('auth.hero.body', 'en-US', 'Join the elite ecosystem of automotive specialists and car enthusiasts driving the future of service management.'),
-      ('auth.role.user.description', 'en-US', 'I need service'),
-      ('auth.role.garage.description', 'en-US', 'I provide service'),
-      ('auth.role.vendor.description', 'en-US', 'I sell parts')
-      ON CONFLICT (content_key, locale) DO NOTHING;
+      (
+        'default',
+        'auth',
+        'login',
+        'en-US',
+        1,
+        '{
+          "appName": "WrectifAI",
+          "authModeLabel": "Phone + OTP authentication",
+          "hero": {
+            "kicker": "AUTOMOTIVE INTELLIGENCE",
+            "title": "Experience Surgical Precision in Car Care.",
+            "body": "Join the elite ecosystem of automotive specialists and car enthusiasts driving the future of service management."
+          },
+          "links": {
+            "needAccountPrefix": "Need an account?",
+            "needAccountCta": "Register"
+          },
+          "form": {
+            "title": "Welcome Back",
+            "subtitle": "Login with your 10-digit phone number.",
+            "phoneLabel": "Phone Number *",
+            "phonePlaceholder": "9876543210",
+            "sendOtpLabel": "Send OTP",
+            "sendingOtpLabel": "Sending OTP..."
+          },
+          "errors": {
+            "phoneInvalid": "Phone number must be 10 digits",
+            "sendOtpFailed": "Unable to send OTP",
+            "unexpected": "Unexpected error"
+          }
+        }'::jsonb
+      ),
+      (
+        'default',
+        'auth',
+        'register',
+        'en-US',
+        1,
+        '{
+          "appName": "WrectifAI",
+          "authModeLabel": "Phone + OTP authentication",
+          "hero": {
+            "kicker": "AUTOMOTIVE INTELLIGENCE",
+            "title": "Experience Surgical Precision in Car Care.",
+            "body": "Join the elite ecosystem of automotive specialists and car enthusiasts driving the future of service management."
+          },
+          "links": {
+            "haveAccountPrefix": "Already have an account?",
+            "haveAccountCta": "Login"
+          },
+          "form": {
+            "title": "Create Account",
+            "subtitle": "Start your journey with WrectifAI precision today.",
+            "fullNameLabel": "Full Name *",
+            "fullNamePlaceholder": "John Doe",
+            "phoneLabel": "Phone Number *",
+            "phonePlaceholder": "9876543210",
+            "termsLabel": "I agree to the Terms and Privacy Policy *",
+            "createAccountLabel": "Create Account",
+            "sendingOtpLabel": "Sending OTP..."
+          },
+          "errors": {
+            "fullNameRequired": "Full name is required",
+            "phoneInvalid": "Phone number must be 10 digits",
+            "termsRequired": "Please accept terms to continue",
+            "sendOtpFailed": "Unable to send OTP",
+            "unexpected": "Unexpected error"
+          }
+        }'::jsonb
+      ),
+      (
+        'default',
+        'auth',
+        'verify',
+        'en-US',
+        1,
+        '{
+          "appName": "WrectifAI",
+          "authModeLabel": "Phone + OTP authentication",
+          "hero": {
+            "kicker": "AUTOMOTIVE INTELLIGENCE",
+            "title": "Verify Your Secure Access.",
+            "body": "Security check for your account session."
+          },
+          "links": {
+            "backToPrefix": "Back to",
+            "backToRegisterCta": "Register",
+            "backToLoginCta": "Login"
+          },
+          "form": {
+            "title": "Verify OTP",
+            "subtitleTemplate": "Please enter 6 digit OTP sent to {phone}.",
+            "otpLabel": "OTP",
+            "otpPlaceholder": "Please enter 6 digit OTP",
+            "ctaLabel": "Verify and Continue",
+            "ctaLoadingLabel": "Verifying..."
+          },
+          "errors": {
+            "otpInvalid": "OTP must be 6 digits",
+            "verifyFailed": "Unable to verify OTP",
+            "unexpected": "Unexpected error"
+          }
+        }'::jsonb
+      )
+      ON CONFLICT (tenant_id, module, page, locale)
+      DO UPDATE SET content = EXCLUDED.content, version = ui_content.version + 1, updated_at = NOW();
     `
   );
 }

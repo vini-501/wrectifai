@@ -12,9 +12,32 @@ type VerifyFormProps = {
   phone: string;
   roleCode?: string;
   fullName?: string;
+  title: string;
+  subtitleTemplate: string;
+  otpLabel: string;
+  otpPlaceholder: string;
+  ctaLabel: string;
+  ctaLoadingLabel: string;
+  invalidOtpMessage: string;
+  verifyFailedMessage: string;
+  unexpectedErrorMessage: string;
 };
 
-export function VerifyForm({ mode, phone, roleCode, fullName }: VerifyFormProps) {
+export function VerifyForm({
+  mode,
+  phone,
+  roleCode,
+  fullName,
+  title,
+  subtitleTemplate,
+  otpLabel,
+  otpPlaceholder,
+  ctaLabel,
+  ctaLoadingLabel,
+  invalidOtpMessage,
+  verifyFailedMessage,
+  unexpectedErrorMessage,
+}: VerifyFormProps) {
   const router = useRouter();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +47,7 @@ export function VerifyForm({ mode, phone, roleCode, fullName }: VerifyFormProps)
     e.preventDefault();
     setError(null);
     if (!/^\d{6}$/.test(otp)) {
-      setError('OTP must be 6 digits');
+      setError(invalidOtpMessage);
       return;
     }
 
@@ -45,11 +68,11 @@ export function VerifyForm({ mode, phone, roleCode, fullName }: VerifyFormProps)
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message ?? 'Unable to verify OTP');
+        throw new Error(data.message ?? verifyFailedMessage);
       }
       router.push(data.redirectPath ?? '/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error');
+      setError(err instanceof Error ? err.message : unexpectedErrorMessage);
     } finally {
       setLoading(false);
     }
@@ -57,26 +80,26 @@ export function VerifyForm({ mode, phone, roleCode, fullName }: VerifyFormProps)
 
   return (
     <div className="mx-auto max-w-md">
-      <h2 className="font-display text-4xl font-bold text-foreground">Verify OTP</h2>
+      <h2 className="font-display text-4xl font-bold text-foreground">{title}</h2>
       <p className="mt-2 text-muted-foreground">
-        Please enter 6 digit OTP sent to {phone}.
+        {subtitleTemplate.replace('{phone}', phone)}
       </p>
 
       <form className="mt-8 space-y-4" onSubmit={onSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="otp">OTP</Label>
+          <Label htmlFor="otp">{otpLabel}</Label>
           <Input
             id="otp"
             inputMode="numeric"
             maxLength={6}
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="Please enter 6 digit OTP"
+            placeholder={otpPlaceholder}
           />
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button className="h-12 w-full text-base" type="submit" disabled={loading}>
-          {loading ? 'Verifying...' : 'Verify and Continue'}
+          {loading ? ctaLoadingLabel : ctaLabel}
         </Button>
       </form>
     </div>

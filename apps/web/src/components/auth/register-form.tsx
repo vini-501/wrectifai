@@ -1,55 +1,76 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, UserRound, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { API_BASE_URL } from '@/lib/api';
-import { cn } from '@/lib/utils';
-
-type RoleOption = { code: 'user' | 'garage' | 'vendor'; label: string; description: string };
 
 type RegisterFormProps = {
+  roleCode: 'user' | 'garage' | 'vendor';
+  registerPath: string;
   title: string;
   subtitle: string;
-  roleOptions: RoleOption[];
+  fullNameLabel: string;
+  fullNamePlaceholder: string;
+  phoneLabel: string;
+  phonePlaceholder: string;
+  termsLabel: string;
+  createAccountLabel: string;
+  sendingOtpLabel: string;
+  fullNameRequiredMessage: string;
+  invalidPhoneMessage: string;
+  termsRequiredMessage: string;
+  sendOtpFailedMessage: string;
+  unexpectedErrorMessage: string;
 };
 
-const icons = {
-  user: UserRound,
-  garage: Store,
-  vendor: Wrench,
-};
-
-export function RegisterForm({ title, subtitle, roleOptions }: RegisterFormProps) {
+export function RegisterForm({
+  roleCode,
+  registerPath,
+  title,
+  subtitle,
+  fullNameLabel,
+  fullNamePlaceholder,
+  phoneLabel,
+  phonePlaceholder,
+  termsLabel,
+  createAccountLabel,
+  sendingOtpLabel,
+  fullNameRequiredMessage,
+  invalidPhoneMessage,
+  termsRequiredMessage,
+  sendOtpFailedMessage,
+  unexpectedErrorMessage,
+}: RegisterFormProps) {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [roleCode, setRoleCode] = useState<RoleOption['code']>('user');
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const filteredOptions = useMemo(
-    () => roleOptions.filter((role) => ['user', 'garage', 'vendor'].includes(role.code)),
-    [roleOptions]
-  );
+  const [fieldErrors, setFieldErrors] = useState<{ fullName?: string; phone?: string; terms?: string }>({});
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
+
+    const errors: { fullName?: string; phone?: string; terms?: string } = {};
+
     if (!fullName.trim()) {
-      setError('Full name is required');
-      return;
+      errors.fullName = fullNameRequiredMessage;
     }
     if (!/^\d{10}$/.test(phone)) {
-      setError('Phone number must be 10 digits');
-      return;
+      errors.phone = invalidPhoneMessage;
     }
     if (!accepted) {
-      setError('Please accept terms to continue');
+      errors.terms = termsRequiredMessage;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
@@ -67,13 +88,13 @@ export function RegisterForm({ title, subtitle, roleOptions }: RegisterFormProps
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message ?? 'Unable to send OTP');
+        throw new Error(data.message ?? sendOtpFailedMessage);
       }
       router.push(
-        `/auth/verify?mode=register&phone=${encodeURIComponent(phone)}&fullName=${encodeURIComponent(fullName)}&roleCode=${roleCode}`
+        `/auth/verify?mode=register&phone=${encodeURIComponent(phone)}&fullName=${encodeURIComponent(fullName)}&roleCode=${roleCode}&registerPath=${encodeURIComponent(registerPath)}`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error');
+      setError(err instanceof Error ? err.message : unexpectedErrorMessage);
     } finally {
       setLoading(false);
     }
@@ -85,71 +106,53 @@ export function RegisterForm({ title, subtitle, roleOptions }: RegisterFormProps
       <p className="mt-2 text-muted-foreground">{subtitle}</p>
 
       <form className="mt-8 space-y-5" onSubmit={onSubmit}>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {filteredOptions.map((role) => {
-            const Icon = icons[role.code];
-            const active = roleCode === role.code;
-            return (
-              <button
-                key={role.code}
-                type="button"
-                onClick={() => setRoleCode(role.code)}
-                className={cn(
-                  'rounded-lg p-4 text-left transition-colors',
-                  active
-                    ? 'bg-accent ring-2 ring-primary'
-                    : 'surface-low ghost-border hover:bg-accent'
-                )}
-              >
-                <Icon className="mb-2 h-5 w-5 text-primary" />
-                <p className="font-semibold text-foreground">{role.label}</p>
-                <p className="text-xs text-muted-foreground">{role.description}</p>
-              </button>
-            );
-          })}
-        </div>
-
         <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name</Label>
+          <Label htmlFor="fullName">{fullNameLabel}</Label>
           <Input
             id="fullName"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="John Doe"
+            placeholder={fullNamePlaceholder}
+            className={fieldErrors.fullName ? 'border-destructive' : ''}
           />
+          {fieldErrors.fullName && <p className="text-sm text-destructive">{fieldErrors.fullName}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">{phoneLabel}</Label>
           <Input
             id="phone"
             type="tel"
             inputMode="numeric"
             pattern="[0-9]{10}"
             maxLength={10}
-            placeholder="9876543210"
+            placeholder={phonePlaceholder}
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            className={fieldErrors.phone ? 'border-destructive' : ''}
           />
+          {fieldErrors.phone && <p className="text-sm text-destructive">{fieldErrors.phone}</p>}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-            className="h-4 w-4 accent-[hsl(var(--primary))]"
-          />
-          I agree to the Terms and Privacy Policy
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
+            />
+            {termsLabel}
+          </label>
+          {fieldErrors.terms && <p className="text-sm text-destructive">{fieldErrors.terms}</p>}
+        </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         <Button className="h-12 w-full text-base" type="submit" disabled={loading}>
-          {loading ? 'Sending OTP...' : 'Create Account'}
+          {loading ? sendingOtpLabel : createAccountLabel}
         </Button>
       </form>
     </div>
   );
 }
-
