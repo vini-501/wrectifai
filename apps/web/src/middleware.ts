@@ -10,8 +10,14 @@ const publicPaths = [
 ];
 const rolePrefixes = ['/user', '/garage', '/vendor', '/admin'] as const;
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
+function getApiBaseUrl(req: NextRequest) {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    return `${req.nextUrl.origin}/api`;
+  }
+  return 'http://localhost:3000/api';
+}
 
 function withNoStore(res: NextResponse) {
   res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -25,7 +31,8 @@ async function getSessionRole(req: NextRequest) {
   if (!accessToken) return null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    const apiBaseUrl = getApiBaseUrl(req);
+    const response = await fetch(`${apiBaseUrl}/auth/me`, {
       method: 'GET',
       headers: {
         cookie: req.headers.get('cookie') ?? '',

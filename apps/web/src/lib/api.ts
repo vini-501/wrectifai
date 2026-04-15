@@ -1,5 +1,14 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
+function resolveApiBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV !== 'production') return 'http://localhost:3000/api';
+  if (typeof window !== 'undefined') return '/api';
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (vercelUrl) return `https://${vercelUrl}/api`;
+  return '/api';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? 'default';
 

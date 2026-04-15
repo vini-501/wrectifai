@@ -1,4 +1,29 @@
-# 
+# Wrectifai
+
+## Vercel Deployment (Web + API)
+
+Recommended setup:
+
+- Create one Vercel project for `apps/web` (Root Directory = `apps/web`).
+- Create one Vercel project for `apps/api` (Root Directory = `apps/api`).
+- API project uses serverless catch-all handler at `apps/api/api/[...path].ts`.
+
+Set these environment variables in Vercel:
+
+- `DATABASE_URL`: Postgres connection string for the API.
+- `WEB_ORIGINS`: Comma-separated list of allowed web origins for CORS.
+  Example: `https://your-app.vercel.app,https://your-app-git-main-your-team.vercel.app`
+- `NEXT_PUBLIC_API_BASE_URL`: API base URL used by web app.
+  - If API is same-origin under `/api`, set to `https://your-app.vercel.app/api`.
+  - If API is on another domain, set that full `/api` URL.
+- `COOKIE_SAME_SITE`: `lax` for same-site deployments, `none` for cross-site web/api.
+- `COOKIE_DOMAIN` (optional): Shared cookie domain when needed (example: `.yourdomain.com`).
+
+Notes:
+- `COOKIE_SAME_SITE=none` requires HTTPS and secure cookies.
+- CORS now supports an explicit allowlist via `WEB_ORIGINS`.
+
+---
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 

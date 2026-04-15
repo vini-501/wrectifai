@@ -6,12 +6,32 @@ import { ensureDbBootstrap } from './db/bootstrap';
 
 export function createApp() {
   const app = express();
-  const { webOrigin } = getEnv();
+  const { webOrigins } = getEnv();
+  const originAllowlist = new Set(webOrigins);
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    originAllowlist.add(`https://${vercelUrl}`);
+  }
 
   const bootstrap = ensureDbBootstrap();
 
+  app.set('trust proxy', 1);
+
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', webOrigin);
+    const requestOrigin = req.headers.origin;
+    const hasOrigin = typeof requestOrigin === 'string' && requestOrigin.length > 0;
+    const isAllowed = hasOrigin ? originAllowlist.has(requestOrigin) : true;
+
+    if (!isAllowed) {
+      if (req.method === 'OPTIONS') return res.sendStatus(403);
+      return res.status(403).json({ message: 'Origin not allowed' });
+    }
+
+    const allowOrigin = hasOrigin ? requestOrigin : [...originAllowlist][0];
+    if (allowOrigin) {
+      res.header('Access-Control-Allow-Origin', allowOrigin);
+    }
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');

@@ -11,6 +11,7 @@ import {
   validateSocialProviderOrThrow,
 } from './auth.service';
 import { requireAuth } from './auth.middleware';
+import { getEnv } from '../../config/env';
 
 export const authRouter = Router();
 
@@ -37,33 +38,34 @@ function setSessionCookies(
     refreshExpiresAt: Date;
   }
 ) {
-  const secure = process.env.NODE_ENV === 'production';
-  res.cookie('wrect_at', session.accessToken, {
+  const { cookieSameSite, cookieDomain } = getEnv();
+  const secure = process.env.NODE_ENV === 'production' || cookieSameSite === 'none';
+  const base = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     secure,
-    expires: session.expiresAt,
     path: '/',
+    domain: cookieDomain,
+  } as const;
+
+  res.cookie('wrect_at', session.accessToken, {
+    ...base,
+    expires: session.expiresAt,
   });
   res.cookie('wrect_rt', session.refreshToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure,
+    ...base,
     expires: session.refreshExpiresAt,
-    path: '/',
   });
   res.cookie('wrect_role', session.roleCode, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure,
+    ...base,
     expires: session.refreshExpiresAt,
-    path: '/',
   });
 }
 
 function clearSessionCookies(res: Response) {
-  const secure = process.env.NODE_ENV === 'production';
-  const base = { path: '/', sameSite: 'lax' as const, secure };
+  const { cookieSameSite, cookieDomain } = getEnv();
+  const secure = process.env.NODE_ENV === 'production' || cookieSameSite === 'none';
+  const base = { path: '/', sameSite: cookieSameSite, secure, domain: cookieDomain };
   res.clearCookie('wrect_at', { ...base, httpOnly: true });
   res.clearCookie('wrect_rt', { ...base, httpOnly: true });
   res.clearCookie('wrect_role', { ...base, httpOnly: true });
