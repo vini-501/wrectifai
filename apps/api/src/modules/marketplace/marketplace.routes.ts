@@ -7,6 +7,147 @@ export const marketplaceRouter = Router();
 
 marketplaceRouter.use(requireAuth, requireRole('user'));
 
+type IntakePayload = {
+  source?: 'diagnosis' | 'direct';
+  diagnosisSessionId?: string;
+  vehicle?: {
+    id?: string;
+    type?: string;
+    brand?: string;
+    model?: string;
+    year?: number;
+    fuel?: string;
+    variant?: string;
+  };
+  issue?: {
+    category?: string;
+    symptoms?: string[];
+    severity?: string;
+    description?: string;
+    sinceWhen?: string;
+    whenHappens?: string;
+  };
+  media?: Array<{
+    type?: 'image' | 'video' | 'audio';
+    name?: string;
+  }>;
+  location?: {
+    lat?: number;
+    lng?: number;
+    address?: string;
+  };
+  serviceType?: 'pickup' | 'visit';
+  schedule?: {
+    mode?: 'now' | 'scheduled';
+    preferredAt?: string;
+  };
+  user?: {
+    name?: string;
+    phone?: string;
+    alternatePhone?: string;
+  };
+};
+
+function cleanText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function cleanPhone(value: unknown) {
+  return cleanText(value).replace(/\D/g, '');
+}
+
+function summarizeIssue(payload: IntakePayload) {
+  const category = cleanText(payload.issue?.category);
+  const description = cleanText(payload.issue?.description);
+  const severity = cleanText(payload.issue?.severity);
+  if (description) return description;
+  if (category && severity) return `${category} issue (${severity})`;
+  if (category) return `${category} issue`;
+  return 'Service request';
+}
+
+async function resolveVehicleId(userId: string, payload: IntakePayload) {
+  const vehicleId = cleanText(payload.vehicle?.id);
+  if (vehicleId) {
+    const existing = await query<{ id: string }>(
+      `SELECT id FROM vehicles WHERE id = $1 AND user_id = $2 LIMIT 1`,
+      [vehicleId, userId]
+    );
+    if (!existing.rows[0]) {
+      throw new Error('Selected vehicle was not found');
+    }
+    return vehicleId;
+  }
+
+  const brand = cleanText(payload.vehicle?.brand);
+  const model = cleanText(payload.vehicle?.model);
+  const fuel = cleanText(payload.vehicle?.fuel);
+  const year = Number(payload.vehicle?.year ?? 0);
+  if (!brand || !model || !fuel || !year) {
+    throw new Error('Vehicle details are required');
+  }
+
+  const newVehicleId = crypto.randomUUID();
+  await query(
+    `
+      INSERT INTO vehicles (id, user_id, make, model, year, fuel_type, trim, is_default)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,FALSE)
+    `,
+    [newVehicleId, userId, brand, model, year, fuel, cleanText(payload.vehicle?.variant) || null]
+  );
+  return newVehicleId;
+}
+
+marketplaceRouter.post('/intake', async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    const body = (req.body ?? {}) as IntakePayload;
+
+    const category = cleanText(body.issue?.category);
+    const severity = cleanText(body.issue?.severity);
+    const userName = cleanText(body.user?.name);
+    const userPhone = cleanPhone(body.user?.phone);
+    const source = body.source === 'diagnosis' ? 'diagnosis' : 'direct';
+
+    if (!category || !severity) {
+      return res.status(400).json({ message: 'Issue category and severity are required' });
+    }
+    if (!userName || userPhone.length < 10) {
+      return res.status(400).json({ message: 'Valid contact name and phone are required' });
+    }
+
+    let diagnosisSessionId: string | null = null;
+    if (cleanText(body.diagnosisSessionId)) {
+      const session = await query<{ id: string }>(
+        `SELECT id FROM diagnosis_sessions WHERE id = $1 AND customer_user_id = $2 LIMIT 1`,
+        [cleanText(body.diagnosisSessionId), userId]
+      );
+      diagnosisSessionId = session.rows[0]?.id ?? null;
+    }
+
+    const vehicleId = await resolveVehicleId(userId, body);
+    const issueId = crypto.randomUUID();
+    const summary = summarizeIssue(body);
+
+    await query(
+      `
+        INSERT INTO issue_requests (
+          id, customer_user_id, vehicle_id, diagnosis_session_id, summary, issue_source, issue_payload, status
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,'open')
+      `,
+      [issueId, userId, vehicleId, diagnosisSessionId, summary, source, JSON.stringify(body)]
+    );
+
+    return res.status(201).json({ issueId, message: 'Service intake submitted' });
+  } catch (error) {
+    if (error instanceof Error && /vehicle/i.test(error.message)) {
+      return res.status(400).json({ message: error.message });
+    }
+    return next(error);
+  }
+});
+
 marketplaceRouter.post('/issues', async (req, res, next) => {
   try {
     const userId = req.authUser!.userId;
@@ -86,6 +227,94 @@ marketplaceRouter.get('/issues', async (req, res, next) => {
         quoteCount: Number(row.quote_count),
       })),
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+marketplaceRouter.get('/issues/:issueId', async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    const { issueId } = req.params;
+
+    const issue = await query<{
+      id: string;
+      summary: string;
+      status: string;
+      issue_source: 'diagnosis' | 'direct';
+      issue_payload: Record<string, unknown>;
+      created_at: Date;
+      quote_count: string;
+      make: string;
+      model: string;
+      year: number;
+    }>(
+      `
+        SELECT
+          i.id,
+          i.summary,
+          i.status,
+          i.issue_source,
+          i.issue_payload,
+          i.created_at,
+          COUNT(q.id)::text AS quote_count,
+          v.make,
+          v.model,
+          v.year
+        FROM issue_requests i
+        INNER JOIN vehicles v ON v.id = i.vehicle_id
+        LEFT JOIN quotes q ON q.issue_request_id = i.id
+        WHERE i.id = $1 AND i.customer_user_id = $2
+        GROUP BY i.id, v.id
+        LIMIT 1
+      `,
+      [issueId, userId]
+    );
+
+    const row = issue.rows[0];
+    if (!row) {
+      return res.status(404).json({ message: 'Issue request not found' });
+    }
+
+    return res.json({
+      issue: {
+        id: row.id,
+        summary: row.summary,
+        status: row.status,
+        source: row.issue_source,
+        quoteCount: Number(row.quote_count),
+        createdAt: row.created_at,
+        vehicleLabel: `${row.year} ${row.make} ${row.model}`,
+        issuePayload: row.issue_payload ?? {},
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+marketplaceRouter.post('/issues/:issueId/raise-to-garage', async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    const { issueId } = req.params;
+
+    const own = await query<{ id: string; status: string }>(
+      `SELECT id, status FROM issue_requests WHERE id = $1 AND customer_user_id = $2 LIMIT 1`,
+      [issueId, userId]
+    );
+    const row = own.rows[0];
+    if (!row) {
+      return res.status(404).json({ message: 'Issue request not found' });
+    }
+    if (row.status === 'quote_accepted') {
+      return res.status(409).json({ message: 'Quote already accepted for this issue' });
+    }
+
+    await query(`UPDATE issue_requests SET status = 'quotes_pending', updated_at = NOW() WHERE id = $1`, [
+      issueId,
+    ]);
+
+    return res.json({ message: 'Issue raised to garage' });
   } catch (error) {
     return next(error);
   }
@@ -185,11 +414,26 @@ marketplaceRouter.post('/quotes/:quoteId/select', async (req, res, next) => {
       return res.status(404).json({ message: 'Quote not found' });
     }
 
+    const acceptedQuote = await query<{ id: string }>(
+      `
+        SELECT q.id
+        FROM quotes q
+        WHERE q.issue_request_id = $1
+          AND q.status = 'selected'
+        LIMIT 1
+      `,
+      [row.issue_request_id]
+    );
+    const selectedQuoteId = acceptedQuote.rows[0]?.id ?? null;
+    if (selectedQuoteId && selectedQuoteId !== quoteId) {
+      return res.status(409).json({ message: 'A quote has already been accepted for this issue' });
+    }
+
     await query(
       `UPDATE quotes SET status = CASE WHEN id = $1 THEN 'selected' ELSE 'rejected' END WHERE issue_request_id = $2`,
       [quoteId, row.issue_request_id]
     );
-    await query(`UPDATE issue_requests SET status = 'quoted', updated_at = NOW() WHERE id = $1`, [
+    await query(`UPDATE issue_requests SET status = 'quote_accepted', updated_at = NOW() WHERE id = $1`, [
       row.issue_request_id,
     ]);
 
@@ -207,9 +451,6 @@ marketplaceRouter.post('/quotes/:quoteId/select', async (req, res, next) => {
       `,
       [bookingId, quoteId, userId, row.garage_name]
     );
-    await query(`UPDATE issue_requests SET status = 'booked', updated_at = NOW() WHERE id = $1`, [
-      row.issue_request_id,
-    ]);
 
     return res.json({ message: 'Quote selected and booking created', bookingId });
   } catch (error) {

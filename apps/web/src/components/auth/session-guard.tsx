@@ -17,11 +17,27 @@ export function SessionGuard({ requiredRole }: SessionGuardProps) {
 
     async function verifySession() {
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
+        const me = async () =>
+          fetch(`${API_BASE_URL}/auth/me`, {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+          });
+
+        let response = await me();
+
+        if (!response.ok) {
+          const refreshResponse = await fetch(`${API_BASE_URL}/auth/sessions/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          if (!refreshResponse.ok) {
+            router.replace('/auth/login');
+            return;
+          }
+          response = await me();
+        }
 
         if (!response.ok) {
           router.replace('/auth/login');

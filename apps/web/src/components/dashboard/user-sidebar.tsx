@@ -65,9 +65,9 @@ export function UserSidebar({ activeItem, content }: UserSidebarProps) {
 
   return (
     <aside
-      className="flex h-screen w-72 flex-col overflow-hidden bg-sidebar text-sidebar-foreground shadow-ambient"
+      className="flex h-screen w-72 flex-col overflow-hidden border-r border-[#e4eaf4] bg-white text-slate-900 shadow-ambient"
     >
-      <div className="border-b border-white/10 py-4 flex items-center justify-center px-3">
+      <div className="flex items-center justify-center border-b border-[#e7edf6] px-3 py-4">
         {content.logoUrl && (
           <div className="flex h-24 w-full items-center justify-center overflow-hidden rounded-md bg-white p-2">
             <img
@@ -92,12 +92,12 @@ export function UserSidebar({ activeItem, content }: UserSidebarProps) {
               className={cn(
                 'h-auto w-full justify-start gap-3.5 rounded-md px-3.5 py-3 text-left text-[15px] font-medium transition-colors',
                 active
-                  ? 'bg-sidebar-accent text-white ring-1 ring-blue-300/30'
-                  : 'text-blue-100/85 hover:bg-white/5 hover:text-white'
+                  ? 'bg-[#eaf3ff] text-[#0f62d6] ring-1 ring-[#b9d4fb]'
+                  : 'text-slate-600 hover:bg-[#f4f8ff] hover:text-[#0f62d6]'
               )}
             >
               <Link href={item.href}>
-                <Icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-blue-200' : 'text-blue-300/80')} />
+                <Icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-[#0f62d6]' : 'text-slate-400')} />
                 <span>{content.nav[item.key] || navLabelFallback[item.key]}</span>
               </Link>
             </Button>
@@ -109,7 +109,7 @@ export function UserSidebar({ activeItem, content }: UserSidebarProps) {
         <LogoutButton
           variant="ghost"
           withIcon
-          className="h-auto w-full justify-start gap-3.5 rounded-md px-3.5 py-3 text-left text-[15px] font-medium text-blue-100/85 transition-colors hover:bg-white/5 hover:text-white"
+          className="h-auto w-full justify-start gap-3.5 rounded-md px-3.5 py-3 text-left text-[15px] font-medium text-slate-600 transition-colors hover:bg-[#f4f8ff] hover:text-[#0f62d6]"
         />
       </div>
     </aside>

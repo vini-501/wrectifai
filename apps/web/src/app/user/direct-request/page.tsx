@@ -1,5 +1,5 @@
 import { getAppIdentityConfig, getUserSidebarContent } from '@/lib/api';
-import { AiDiagnosisClient } from './ai-diagnosis-client';
+import { DirectRequestClient } from './direct-request-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,5 +9,5 @@ export default async function Page() {
     getAppIdentityConfig(),
   ]);
 
-  return <AiDiagnosisClient sidebar={sidebar} appLogoUrl={appIdentity.logoUrl} />;
+  return <DirectRequestClient sidebar={sidebar} appLogoUrl={appIdentity.logoUrl} />;
 }

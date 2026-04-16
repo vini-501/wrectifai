@@ -189,10 +189,22 @@ export function ensureDbBootstrap() {
         vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
         diagnosis_session_id UUID REFERENCES diagnosis_sessions(id) ON DELETE SET NULL,
         summary TEXT NOT NULL,
+        issue_source TEXT NOT NULL DEFAULT 'direct',
+        issue_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
         status TEXT NOT NULL DEFAULT 'open',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await query(`
+      ALTER TABLE issue_requests
+      ADD COLUMN IF NOT EXISTS issue_source TEXT NOT NULL DEFAULT 'direct';
+    `);
+
+    await query(`
+      ALTER TABLE issue_requests
+      ADD COLUMN IF NOT EXISTS issue_payload JSONB NOT NULL DEFAULT '{}'::jsonb;
     `);
 
     await query(`

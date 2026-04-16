@@ -1038,6 +1038,92 @@ export async function createDiagnosisSession(input: {
   };
 }
 
+export type ServiceIntakePayload = {
+  source: 'diagnosis' | 'direct';
+  diagnosisSessionId?: string;
+  vehicle: {
+    id?: string;
+    type: 'car' | 'bike' | 'other';
+    brand: string;
+    model: string;
+    year: number;
+    fuel: string;
+    variant?: string;
+  };
+  issue: {
+    category: string;
+    symptoms: string[];
+    severity: 'can_drive' | 'risky' | 'not_starting';
+    description?: string;
+    sinceWhen?: 'today' | 'few_days' | 'weeks';
+    whenHappens?: 'starting' | 'driving' | 'idling' | 'braking';
+    answers?: Record<string, string>;
+  };
+  media: Array<{
+    type: 'image' | 'video' | 'audio';
+    name: string;
+  }>;
+  location: {
+    lat?: number;
+    lng?: number;
+    address: string;
+  };
+  serviceType: 'pickup' | 'visit';
+  schedule: {
+    mode: 'now' | 'scheduled';
+    preferredAt?: string;
+  };
+  user: {
+    name: string;
+    phone: string;
+    alternatePhone?: string;
+  };
+};
+
+export type DynamicDiagnosisQuestion = {
+  id: string;
+  type: 'single_select' | 'boolean' | 'text' | 'file';
+  label: string;
+  options?: string[];
+  required: boolean;
+};
+
+export async function fetchDynamicDiagnosisQuestions(input: {
+  prompt: string;
+  firstAnswer: string;
+  category?: string;
+  mode?: 'diagnosis' | 'direct';
+  maxQuestions?: number;
+}): Promise<DynamicDiagnosisQuestion[]> {
+  const response = await fetch(`${API_BASE_URL}/diagnosis/dynamic-questions`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const data = (await response.json()) as {
+    message?: string;
+    questions?: DynamicDiagnosisQuestion[];
+  };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to generate dynamic questions');
+  return data.questions ?? [];
+}
+
+export async function submitServiceIntake(input: ServiceIntakePayload): Promise<{ issueId: string }> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/marketplace/intake`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+  );
+  const data = (await response.json()) as { message?: string; issueId?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to submit service request');
+  if (!data.issueId) throw new Error('Issue ID was not returned');
+  return { issueId: data.issueId };
+}
+
 export async function getQuotesBookingsContent(options?: {
   locale?: string;
   tenantId?: string;
@@ -1055,6 +1141,11 @@ export type MockIssueRequest = {
   id: string;
   summary: string;
   quotes: MockQuote[];
+  status?: string;
+  createdAt?: string | Date;
+  source?: 'diagnosis' | 'direct';
+  severity?: string;
+  vehicleLabel?: string;
 };
 
 export type MockQuote = {
@@ -1067,6 +1158,7 @@ export type MockQuote = {
   totalCost: number;
   comparisonLabel: 'below_market' | 'fair' | 'above_market';
   isBestMatch: boolean;
+  status?: 'submitted' | 'selected' | 'rejected' | string;
 };
 
 export type MockBooking = {
@@ -1096,17 +1188,70 @@ export async function createIssueRequest(input: {
   return data;
 }
 
-export async function fetchIssueRequests(): Promise<Array<{ id: string; summary: string; quoteCount: number }>> {
+export type IssueRequestListItem = {
+  id: string;
+  summary: string;
+  quoteCount: number;
+  status?: string;
+  createdAt?: string | Date;
+  source?: 'diagnosis' | 'direct';
+  severity?: string;
+  vehicleLabel?: string;
+};
+
+export async function fetchIssueRequests(): Promise<IssueRequestListItem[]> {
   const response = await fetch(`${API_BASE_URL}/marketplace/issues`, {
     credentials: 'include',
     cache: 'no-store',
   });
   const data = (await response.json()) as {
     message?: string;
-    issues?: Array<{ id: string; summary: string; quoteCount: number }>;
+    issues?: IssueRequestListItem[];
   };
   if (!response.ok) throw new Error(data.message ?? 'Failed to load issue requests');
   return data.issues ?? [];
+}
+
+export type IssueDetail = {
+  id: string;
+  summary: string;
+  status: string;
+  source: 'diagnosis' | 'direct';
+  quoteCount: number;
+  createdAt: string | Date;
+  vehicleLabel: string;
+  issuePayload?: {
+    issue?: {
+      category?: string;
+      severity?: string;
+      description?: string;
+      answers?: Record<string, string>;
+    };
+  };
+};
+
+export async function fetchIssueDetail(issueId: string): Promise<IssueDetail> {
+  const response = await fetch(`${API_BASE_URL}/marketplace/issues/${encodeURIComponent(issueId)}`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const data = (await response.json()) as { message?: string; issue?: IssueDetail };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load issue details');
+  if (!data.issue) throw new Error('Issue details were not returned');
+  return data.issue;
+}
+
+export async function raiseIssueToGarage(issueId: string): Promise<{ message?: string }> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/marketplace/issues/${encodeURIComponent(issueId)}/raise-to-garage`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to raise issue to garage');
+  return data;
 }
 
 export async function fetchIssueQuotes(issueId: string): Promise<MockQuote[]> {
@@ -1122,12 +1267,31 @@ export async function fetchIssueQuotes(issueId: string): Promise<MockQuote[]> {
   return data.quotes ?? [];
 }
 
-export async function selectQuote(quoteId: string): Promise<{ bookingId?: string }> {
-  const response = await fetch(`${API_BASE_URL}/marketplace/quotes/${encodeURIComponent(quoteId)}/select`, {
+async function withSessionRefreshRetry(
+  request: () => Promise<Response>
+): Promise<Response> {
+  let response = await request();
+  if (response.status !== 401) return response;
+
+  const refreshResponse = await fetch(`${API_BASE_URL}/auth/sessions/refresh`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
   });
+  if (!refreshResponse.ok) return response;
+
+  response = await request();
+  return response;
+}
+
+export async function selectQuote(quoteId: string): Promise<{ bookingId?: string }> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/marketplace/quotes/${encodeURIComponent(quoteId)}/select`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
   const data = (await response.json()) as { message?: string; bookingId?: string };
   if (!response.ok) throw new Error(data.message ?? 'Failed to select quote');
   return { bookingId: data.bookingId };
@@ -1266,12 +1430,12 @@ export const USER_DASHBOARD_DEFAULT: UserDashboardContent = {
   actions: {
     title: 'Precision Operations',
     diagnosis: {
-      title: 'AI Diagnosis',
-      description: 'Run a virtual checkup on your vehicle.',
+      title: 'Guided Issue Assessment',
+      description: 'Analyze symptoms first and decide if it is DIY-safe or needs a garage.',
     },
     garage: {
-      title: 'My Garage',
-      description: 'Manage your personal fleet.',
+      title: 'Direct Service Request',
+      description: 'Skip analysis and raise a direct service request when you already know the issue.',
     },
     quotes: {
       title: 'Quotes Hub',

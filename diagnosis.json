@@ -1,0 +1,223 @@
+{
+  "categories": [
+    {
+      "id": "engine",
+      "label": "Engine Issue",
+      "questions": [
+        {
+          "id": "when_occurs",
+          "type": "single_select",
+          "label": "When does the issue occur?",
+          "options": ["Starting", "While driving", "Idling"],
+          "required": true
+        },
+        {
+          "id": "noise",
+          "type": "boolean",
+          "label": "Do you hear unusual engine noise?",
+          "required": true
+        },
+        {
+          "id": "smoke",
+          "type": "single_select",
+          "label": "Do you see smoke?",
+          "options": ["No", "White", "Black", "Blue"],
+          "required": true
+        },
+        {
+          "id": "starting_issue",
+          "type": "single_select",
+          "label": "Starting condition?",
+          "options": ["Starts normally", "Takes time", "Does not start"],
+          "required": true
+        },
+        {
+          "id": "power_loss",
+          "type": "boolean",
+          "label": "Do you feel loss of power while driving?",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "battery",
+      "label": "Battery Issue",
+      "questions": [
+        {
+          "id": "vehicle_start",
+          "type": "single_select",
+          "label": "Vehicle starting status?",
+          "options": ["Starts normally", "Slow start", "Not starting"],
+          "required": true
+        },
+        {
+          "id": "lights_status",
+          "type": "single_select",
+          "label": "Dashboard lights condition?",
+          "options": ["Normal", "Dim", "Not working"],
+          "required": true
+        },
+        {
+          "id": "battery_age",
+          "type": "single_select",
+          "label": "Battery age?",
+          "options": ["< 1 year", "1-2 years", "2-3 years", "3+ years"],
+          "required": true
+        },
+        {
+          "id": "recent_jumpstart",
+          "type": "boolean",
+          "label": "Did you recently jump-start the vehicle?",
+          "required": false
+        },
+        {
+          "id": "electrical_issue",
+          "type": "boolean",
+          "label": "Any electrical failures (horn, lights, etc.)?",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "brake",
+      "label": "Brake Issue",
+      "questions": [
+        {
+          "id": "brake_response",
+          "type": "single_select",
+          "label": "Brake response?",
+          "options": ["Normal", "Soft", "Hard", "Not working"],
+          "required": true
+        },
+        {
+          "id": "brake_noise",
+          "type": "boolean",
+          "label": "Do you hear noise while braking?",
+          "required": true
+        },
+        {
+          "id": "vibration",
+          "type": "boolean",
+          "label": "Do you feel vibration while braking?",
+          "required": true
+        },
+        {
+          "id": "pulling_side",
+          "type": "boolean",
+          "label": "Does vehicle pull to one side?",
+          "required": false
+        },
+        {
+          "id": "brake_warning",
+          "type": "boolean",
+          "label": "Is brake warning light ON?",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "ac",
+      "label": "AC Issue",
+      "questions": [
+        {
+          "id": "cooling",
+          "type": "single_select",
+          "label": "Cooling performance?",
+          "options": ["Normal", "Low cooling", "No cooling"],
+          "required": true
+        },
+        {
+          "id": "cooling_delay",
+          "type": "boolean",
+          "label": "Does cooling take too long?",
+          "required": true
+        },
+        {
+          "id": "ac_noise",
+          "type": "boolean",
+          "label": "Any unusual noise from AC?",
+          "required": false
+        },
+        {
+          "id": "odor",
+          "type": "boolean",
+          "label": "Any bad smell from AC?",
+          "required": false
+        },
+        {
+          "id": "gas_refill_history",
+          "type": "single_select",
+          "label": "When was last gas refill?",
+          "options": ["< 6 months", "6-12 months", "1+ year", "Never"],
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "tyre",
+      "label": "Tyre Issue",
+      "questions": [
+        {
+          "id": "puncture",
+          "type": "boolean",
+          "label": "Is it a puncture?",
+          "required": true
+        },
+        {
+          "id": "air_loss",
+          "type": "boolean",
+          "label": "Is air leaking continuously?",
+          "required": true
+        },
+        {
+          "id": "tyre_condition",
+          "type": "single_select",
+          "label": "Tyre condition?",
+          "options": ["Good", "Worn out", "Damaged"],
+          "required": true
+        },
+        {
+          "id": "recent_change",
+          "type": "boolean",
+          "label": "Was tyre recently changed?",
+          "required": false
+        },
+        {
+          "id": "vehicle_stability",
+          "type": "boolean",
+          "label": "Is vehicle unstable while driving?",
+          "required": false
+        }
+      ]
+    }
+  ],
+
+  "common_questions": [
+    {
+      "id": "severity",
+      "type": "single_select",
+      "label": "How severe is the issue?",
+      "options": ["Can drive", "Risky", "Not working"],
+      "required": true
+    },
+    {
+      "id": "since_when",
+      "type": "single_select",
+      "label": "Since when?",
+      "options": ["Today", "Few days", "Weeks"],
+      "required": true
+    },
+    {
+      "id": "media",
+      "type": "file",
+      "label": "Upload photos/videos (optional)",
+      "required": false
+    },
+    {
+      "id": "description",
+      "type": "text",
+      "label": "Additional details",
+      "required": false
+    }
+  ]
+}

@@ -28,7 +28,17 @@ function withNoStore(res: NextResponse) {
 
 async function getSessionRole(req: NextRequest) {
   const accessToken = req.cookies.get('wrect_at')?.value;
-  if (!accessToken) return null;
+  const refreshToken = req.cookies.get('wrect_rt')?.value;
+  const roleCookie = req.cookies.get('wrect_role')?.value;
+  const roleFromCookie =
+    roleCookie === 'user' || roleCookie === 'garage' || roleCookie === 'vendor' || roleCookie === 'admin'
+      ? roleCookie
+      : null;
+
+  if (!accessToken) {
+    if (refreshToken && roleFromCookie) return roleFromCookie;
+    return null;
+  }
 
   try {
     const apiBaseUrl = getApiBaseUrl(req);
@@ -39,7 +49,10 @@ async function getSessionRole(req: NextRequest) {
       },
       cache: 'no-store',
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (refreshToken && roleFromCookie) return roleFromCookie;
+      return null;
+    }
     const data = (await response.json()) as {
       user?: { roleCode?: 'user' | 'garage' | 'vendor' | 'admin' };
     };

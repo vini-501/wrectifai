@@ -8,6 +8,6 @@ type Props = {
   appLogoUrl?: string;
 };
 
-export function AiDiagnosisClient({ sidebar, appLogoUrl }: Props) {
-  return <ServiceIntakeFlow mode="diagnosis" sidebar={sidebar} appLogoUrl={appLogoUrl} />;
+export function DirectRequestClient({ sidebar, appLogoUrl }: Props) {
+  return <ServiceIntakeFlow mode="direct" sidebar={sidebar} appLogoUrl={appLogoUrl} />;
 }

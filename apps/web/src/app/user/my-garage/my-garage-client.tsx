@@ -223,52 +223,53 @@ export function MyGarageClient({ sidebar, content }: Props) {
       </div>
 
       <section className="flex-1 overflow-y-auto bg-[#f8fafe]">
-        <div className="mx-auto w-full max-w-[1280px] px-6 py-5">
+        <div className="mx-auto w-full max-w-[1280px] px-4 py-4 sm:px-6 sm:py-5">
           <UserTopLogoHeader sidebar={sidebar} />
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-[#e6ebf2] pb-4">
+          <div className="mb-4 sm:mb-6 flex flex-col gap-4 border-b border-[#e6ebf2] pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold leading-none text-[#0f2244] md:text-4xl">MyGarage</h1>
-              <p className="mt-1 text-sm font-medium text-[#6f7f9b]">Precision Driver Fleet Management</p>
+              <h1 className="text-2xl font-bold leading-none text-[#0f2244] md:text-3xl sm:text-4xl">MyGarage</h1>
+              <p className="mt-1 text-xs font-medium text-[#6f7f9b] sm:text-sm">Precision Driver Fleet Management</p>
             </div>
-            <div className="ml-auto flex w-full max-w-[560px] items-center gap-3">
+            <div className="flex w-full flex-col gap-3 sm:max-w-[560px] sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ba9bf]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search vehicle ID..."
-                  className="h-12 rounded-xl border-[#dce4ef] bg-white pl-10 text-sm"
+                  className="h-10 rounded-xl border-[#dce4ef] bg-white pl-10 text-sm sm:h-12"
                 />
               </div>
               <Button
                 onClick={() => setShowAddForm(true)}
-                className="h-12 rounded-xl bg-[#0989d8] px-6 font-semibold text-white hover:bg-[#0874b8]"
+                className="h-10 rounded-xl bg-[#0989d8] px-4 text-sm font-semibold text-white hover:bg-[#0874b8] sm:h-12 sm:px-6"
               >
                 <CirclePlus className="h-4 w-4" />
-                Add New Vehicle
+                <span className="hidden sm:inline ml-2">Add New Vehicle</span>
+                <span className="sm:hidden ml-2">Add</span>
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_360px]">
             <div>
-              <div className="mb-4 flex items-center gap-2">
-                <span className="h-6 w-1 rounded-full bg-[#4ec2ed]" />
-                <h2 className="text-2xl font-semibold tracking-tight text-[#0f2244]">Active Inventory</h2>
+              <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="h-5 w-1 rounded-full bg-[#4ec2ed] sm:h-6" />
+                <h2 className="text-xl font-semibold tracking-tight text-[#0f2244] sm:text-2xl">Active Inventory</h2>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {visibleVehicles.map((vehicle, index) => {
                   const active = vehicle.id === selectedVehicle?.id;
                   return (
                     <button
                       key={vehicle.id}
                       onClick={() => setSelectedVehicleId(vehicle.id)}
-                      className={`overflow-hidden rounded-2xl border bg-white p-3 text-left transition ${
+                      className={`overflow-hidden rounded-2xl border bg-white p-2.5 sm:p-3 text-left transition ${
                         active ? 'border-[#8ed5ef] shadow-[0_6px_16px_rgba(73,144,196,0.18)]' : 'border-[#dde6f0]'
                       }`}
                     >
-                      <div className="relative mb-3 h-56 overflow-hidden rounded-xl">
+                      <div className="relative mb-2.5 sm:mb-3 h-40 sm:h-56 overflow-hidden rounded-xl">
                         <img
                           src={VEHICLE_IMAGES[index % VEHICLE_IMAGES.length]}
                           alt={`${vehicle.make} ${vehicle.model}`}
@@ -276,20 +277,20 @@ export function MyGarageClient({ sidebar, content }: Props) {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
                         {vehicle.isDefault ? (
-                          <span className="absolute right-2 top-2 rounded-full bg-[#dbfff0] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#00a56a]">
+                          <span className="absolute right-2 top-2 rounded-full bg-[#dbfff0] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#00a56a] sm:px-2.5 sm:py-1 sm:text-[10px]">
                             Default
                           </span>
                         ) : null}
                       </div>
 
-                      <div className="space-y-3 text-[#203457]">
+                      <div className="space-y-2.5 text-[#203457] sm:space-y-3">
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#97a9c1]">Vehicle</p>
-                          <p className="mt-1 text-base font-semibold">{vehicle.make} {vehicle.model}</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#97a9c1] sm:text-[10px]">Vehicle</p>
+                          <p className="mt-1 text-sm font-semibold sm:text-base">{vehicle.make} {vehicle.model}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#97a9c1]">Details</p>
-                          <div className="mt-1 space-y-1 text-sm font-semibold">
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#97a9c1] sm:text-[10px]">Details</p>
+                          <div className="mt-1 space-y-0.5 text-xs font-semibold sm:space-y-1 sm:text-sm">
                             <p>Model: {vehicle.model}</p>
                             <p>Year: {vehicle.year}</p>
                             <p>Fuel Type: {vehicle.fuelType}</p>
@@ -304,10 +305,10 @@ export function MyGarageClient({ sidebar, content }: Props) {
                               e.stopPropagation();
                               setVehicleToSetDefault(vehicle);
                             }}
-                            className="h-8 text-xs"
+                            className="h-7 px-2 text-[10px] sm:h-8 sm:px-3 sm:text-xs"
                           >
-                            <Star className="h-3.5 w-3.5" />
-                            Default
+                            <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                            <span className="hidden sm:inline ml-1">Default</span>
                           </Button>
                           <Button
                             type="button"
@@ -317,10 +318,10 @@ export function MyGarageClient({ sidebar, content }: Props) {
                               e.stopPropagation();
                               setVehicleToDelete(vehicle);
                             }}
-                            className="h-8 text-xs text-destructive hover:text-destructive"
+                            className="h-7 px-2 text-[10px] text-destructive hover:text-destructive sm:h-8 sm:px-3 sm:text-xs"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
+                            <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                            <span className="hidden sm:inline ml-1">Delete</span>
                           </Button>
                         </div>
                       </div>
@@ -330,11 +331,11 @@ export function MyGarageClient({ sidebar, content }: Props) {
 
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="grid min-h-[370px] place-items-center rounded-2xl border border-dashed border-[#cfdced] bg-[#f5f8fd] text-center text-[#90a4c2] transition hover:border-[#7abfe6] hover:text-[#4db5df]"
+                  className="grid min-h-[280px] sm:min-h-[370px] place-items-center rounded-2xl border border-dashed border-[#cfdced] bg-[#f5f8fd] text-center text-[#90a4c2] transition hover:border-[#7abfe6] hover:text-[#4db5df]"
                 >
-                  <div>
-                    <CirclePlus className="mx-auto h-8 w-8" />
-                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em]">Register Vehicle</p>
+                  <div className="space-y-2">
+                    <CirclePlus className="mx-auto h-6 w-6 sm:h-8 sm:w-8" />
+                    <p className="text-xs font-semibold sm:text-sm">Add New Vehicle</p>
                   </div>
                 </button>
               </div>
