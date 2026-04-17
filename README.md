@@ -9,8 +9,8 @@
   - Builds Web to `apps/web/.next`
 
 - **Serve both in production:** `pnpm serve:prod`
-  - Runs API on port 3000 (or `PORT` env var)
-  - Runs Web on port 4200
+  - Runs API on port 3000 (or `PORT` env var) - publicly accessible
+  - Runs Web on port 3001 (internal port) - for local testing
   - Requires both projects to be built first
 
 - **Build and serve in one command:**
@@ -45,8 +45,10 @@ For Render deployment:
 2. Set the environment variables listed above
 3. Build command: `pnpm build:all`
 4. Start command: `pnpm serve:prod`
-5. The API will be accessible on the configured port
-6. The Web app will be accessible on port 4200
+5. The API will be accessible on the configured port (default: 3000)
+6. The Web app runs on port 3001 internally (for local testing only)
+
+**Note:** In a typical Render deployment, you would deploy the API and Web as separate services. The API is publicly accessible, while the Web app would be deployed as a separate static site or Next.js service.
 
 ## Vercel Deployment (Alternative)
 

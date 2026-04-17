@@ -7,7 +7,7 @@
     "web": "nx dev web",
     "serve:all": "nx run-many -t serve -p api,web --parallel",
     "build:all": "nx run-many -t build -p api,web",
-    "serve:prod": "concurrently \"node dist/apps/api/main.js\" \"next start apps/web\"",
+    "serve:prod": "concurrently \"node dist/apps/api/main.js\" \"next start apps/web -p 3001\"",
     "mobile": "nx start mobile",
     "lint": "nx run-many -t lint --all",
     "start": "node dist/apps/api/main.js"
