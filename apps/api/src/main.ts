@@ -1,10 +1,8 @@
-import { getEnv } from './config/env';
 import { createApp } from './app';
 
-const { host, port } = getEnv();
+const port = Number(process.env.PORT) || 3000;
 const app = createApp();
 
-app.listen(port, host, () => {
-  console.log("Production server started");
-  console.log(`[api] listening on http://${host}:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Server running on port ${port}`);
 });
