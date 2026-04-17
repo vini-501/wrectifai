@@ -33,6 +33,7 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -64,6 +65,10 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
       setError(null);
       await confirmPaymentIntent(intentId);
       setSuccess(true);
+      setRedirecting(true);
+      setTimeout(() => {
+        router.push('/user/dashboard');
+      }, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to complete payment.');
     } finally {
@@ -84,7 +89,7 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
           <UserTopLogoHeader sidebar={sidebar} />
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">Checkout</CardTitle>
+              <CardTitle className="text-2xl font-bold">Custom Payment Gateway</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               {loading ? (
@@ -106,7 +111,7 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
                         Payment successful
                       </p>
                       <p className="mt-1 text-sm">
-                        Your booking payment has been recorded.
+                        Your booking payment has been recorded. Redirecting to dashboard...
                       </p>
                     </div>
                   ) : null}
@@ -133,7 +138,9 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
                         {submitting ? 'Processing...' : 'Pay Now'}
                       </Button>
                     ) : (
-                      <Button onClick={() => router.push('/user/payments')}>Go To Payments</Button>
+                      <Button onClick={() => router.push('/user/dashboard')} disabled={redirecting}>
+                        {redirecting ? 'Redirecting...' : 'Go To Dashboard'}
+                      </Button>
                     )}
                     <Button asChild variant="outline">
                       <Link href="/user/quotes-bookings">Back to Bookings</Link>
@@ -148,4 +155,3 @@ export function PaymentsCheckoutClient({ sidebar }: Props) {
     </div>
   );
 }
-

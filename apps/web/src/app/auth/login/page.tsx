@@ -11,6 +11,7 @@ export default async function LoginPage() {
   return (
     <AuthShell
       hideHeroOnMobile
+      hideHero
       appName={ui.appName}
       authModeLabel=""
       heroKicker={ui.hero.kicker}

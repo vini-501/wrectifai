@@ -173,6 +173,10 @@ export async function registerWithOtp(input: {
     [crypto.randomUUID(), userId, role.rows[0].id]
   );
 
+  if (input.roleCode === 'garage') {
+    await ensurePendingGarageRegistration(userId, input.fullName.trim());
+  }
+
   return createSession({
     userId,
     roleCode: input.roleCode,
@@ -234,6 +238,73 @@ function derivePhoneFromSocial(provider: SocialProvider, socialSubject: string) 
     .digest('hex');
   const numeric = BigInt(`0x${hash.slice(0, 15)}`) % 9000000000n;
   return `9${numeric.toString().padStart(9, '0')}`;
+}
+
+async function ensurePendingGarageRegistration(userId: string, businessName: string) {
+  const existingGarage = await query<{ id: string }>(
+    `SELECT id FROM garages WHERE owner_user_id = $1::uuid LIMIT 1`,
+    [userId]
+  );
+  if (existingGarage.rows[0]) return;
+
+  const garageColumnTypes = await query<{
+    column_name: string;
+    data_type: string;
+    udt_name: string;
+  }>(
+    `
+      SELECT column_name, data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'garages'
+        AND column_name IN ('specializations', 'business_hours')
+    `
+  );
+
+  const specializationsColumn = garageColumnTypes.rows.find((column) => column.column_name === 'specializations');
+  const businessHoursColumn = garageColumnTypes.rows.find((column) => column.column_name === 'business_hours');
+
+  const specializationsValueSql = specializationsColumn?.udt_name === '_text'
+    ? 'ARRAY[]::text[]'
+    : '\'[]\'::jsonb';
+  const businessHoursValueSql = businessHoursColumn?.data_type === 'jsonb'
+    ? '\'{}\'::jsonb'
+    : '\'{}\'';
+
+  await query(
+    `
+      INSERT INTO garages (
+        id,
+        owner_user_id,
+        business_name,
+        address_line,
+        city,
+        state,
+        postal_code,
+        specializations,
+        business_hours,
+        verification_status,
+        is_approved,
+        trust_score
+      )
+      VALUES (
+        gen_random_uuid(),
+        $1::uuid,
+        $2,
+        'N/A',
+        'N/A',
+        'N/A',
+        'N/A',
+        ${specializationsValueSql},
+        ${businessHoursValueSql},
+        'pending',
+        false,
+        0
+      )
+      ON CONFLICT (owner_user_id) DO NOTHING
+    `,
+    [userId, businessName]
+  );
 }
 
 async function findRoleOrThrow(roleCode: RoleCode) {
@@ -326,6 +397,10 @@ export async function loginOrRegisterWithSocial(input: {
     `,
     [crypto.randomUUID(), userId, input.provider, socialSubject]
   );
+
+  if (roleCode === 'garage') {
+    await ensurePendingGarageRegistration(userId, fullName);
+  }
 
   return createSession({
     userId,

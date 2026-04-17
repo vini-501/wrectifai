@@ -1,11 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
 import { findSessionByAccessToken, type RoleCode } from './auth.service';
+import { query } from '../../db/postgres';
 
 export type AuthUser = {
   userId: string;
   roleCode: RoleCode;
   fullName: string;
   phone: string;
+  garageApproved?: boolean;
+  garageVerificationStatus?: string | null;
 };
 
 function parseCookieValue(req: Request, key: string) {
@@ -27,11 +30,30 @@ async function resolveAuthUser(req: Request) {
   const session = await findSessionByAccessToken(accessToken);
   if (!session) return null;
 
+  let garageApproved: boolean | undefined = undefined;
+  let garageVerificationStatus: string | null | undefined = undefined;
+  if (session.role_code === 'garage') {
+    const garage = await query<{ is_approved: boolean; verification_status: string | null }>(
+      `
+        SELECT is_approved, verification_status
+        FROM garages
+        WHERE owner_user_id = $1::uuid
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [session.user_id]
+    );
+    garageApproved = garage.rows[0]?.is_approved === true;
+    garageVerificationStatus = garage.rows[0]?.verification_status ?? null;
+  }
+
   return {
     userId: session.user_id,
     roleCode: session.role_code,
     fullName: session.full_name,
     phone: session.phone,
+    garageApproved,
+    garageVerificationStatus,
   } satisfies AuthUser;
 }
 
@@ -59,7 +81,16 @@ export function requireRole(roleCode: RoleCode) {
     if (user.roleCode !== roleCode) {
       return res.status(403).json({ message: 'Forbidden for this role' });
     }
+    if (roleCode === 'garage') {
+      const isProfileRoute = req.path === '/profile' || req.path.startsWith('/profile/');
+      const isDashboardRoute = req.path === '/dashboard' || req.path.startsWith('/dashboard/');
+      if (!isProfileRoute && !isDashboardRoute && user.garageApproved === false) {
+        return res.status(403).json({
+          message: 'Your garage account is pending approval. Please wait for admin verification before accessing this feature.',
+          code: 'GARAGE_APPROVAL_PENDING',
+        });
+      }
+    }
     return next();
   };
 }
-

@@ -61,7 +61,7 @@ export function SparePartsClient({ sidebar }: Props) {
         <UserSidebar activeItem="spare-parts" content={sidebar} />
       </div>
       <section className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl p-6">
+        <div className="mx-auto w-full max-w-7xl p-6">
           <UserTopLogoHeader sidebar={sidebar} />
           {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
 

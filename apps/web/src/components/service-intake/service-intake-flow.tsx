@@ -31,6 +31,8 @@ type WhenHappens = 'starting' | 'driving' | 'idling' | 'braking';
 type QuestionType = 'single_select' | 'boolean' | 'text' | 'file';
 type DiagnosisQuestion = {
   id: string;
+  category?: string;
+  baseId?: string;
   type: QuestionType;
   label: string;
   options?: string[];
@@ -242,7 +244,9 @@ export function ServiceIntakeFlow({
   );
 
   const [problem, setProblem] = useState('');
-  const [category, setCategory] = useState<string>(categoryOptions[0]?.value ?? 'engine');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    categoryOptions[0]?.value ? [categoryOptions[0].value] : ['engine']
+  );
   const [dynamicQuestions, setDynamicQuestions] = useState<DiagnosisQuestion[]>([]);
   const [dynamicQuestionsLoading, setDynamicQuestionsLoading] = useState(false);
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
@@ -311,19 +315,26 @@ export function ServiceIntakeFlow({
     setDynamicQuestions([]);
     setQuestionAnswers({});
     setDiagnosisReport(null);
-  }, [category, problem]);
+  }, [problem, selectedCategories]);
 
   async function ensureDynamicQuestions() {
     if (dynamicQuestions.length > 0) return true;
-    if (!category.trim()) {
-      setError('Select issue category first.');
+    if (selectedCategories.length === 0) {
+      setError('Select at least one issue category first.');
       return false;
     }
 
     try {
       setDynamicQuestionsLoading(true);
       setError(null);
-      const generated = (CATEGORY_QUESTION_BANK[category] ?? CATEGORY_QUESTION_BANK.other ?? []).slice(0, 6);
+      const generated = selectedCategories.flatMap((category) =>
+        (CATEGORY_QUESTION_BANK[category] ?? CATEGORY_QUESTION_BANK.other ?? []).map((question) => ({
+          ...question,
+          id: `${category}__${question.id}`,
+          baseId: question.id,
+          category,
+        }))
+      );
       setDynamicQuestions(generated);
       return true;
     } catch {
@@ -361,8 +372,8 @@ export function ServiceIntakeFlow({
 
   async function handleIssueSubmit() {
     setError(null);
-    if (!category.trim()) {
-      setError('Please select the issue category first.');
+    if (selectedCategories.length === 0) {
+      setError('Please select at least one issue category first.');
       return;
     }
     const ok = await ensureDynamicQuestions();
@@ -398,8 +409,13 @@ export function ServiceIntakeFlow({
     const selectedWhen = mapWhenHappens(getWhenOccursAnswer(questionAnswers));
 
     const categorySymptoms = dynamicQuestions
-      .map((q) => (questionAnswers[q.id] ? `${q.id}:${questionAnswers[q.id]}` : ''))
+      .map((q) =>
+        questionAnswers[q.id]
+          ? `${q.category ?? 'other'}:${q.baseId ?? q.id}:${questionAnswers[q.id]}`
+          : ''
+      )
       .filter(Boolean);
+    const primaryCategory = selectedCategories[0] ?? 'other';
 
     const payload: ServiceIntakePayload = {
       source: mode,
@@ -423,13 +439,17 @@ export function ServiceIntakeFlow({
               variant: selected.trim ?? undefined,
             },
       issue: {
-        category,
+        category: primaryCategory,
         symptoms: categorySymptoms,
         severity: selectedSeverity,
         description: problem.trim() || undefined,
         sinceWhen: selectedSince,
         whenHappens: selectedWhen,
-        answers: questionAnswers,
+        answers: {
+          ...questionAnswers,
+          __selected_categories: selectedCategories.join(','),
+          __primary_category: primaryCategory,
+        },
       },
       media,
       location: { lat, lng, address: address.trim() },
@@ -455,10 +475,12 @@ export function ServiceIntakeFlow({
       const { payload, selectedSeverity } = await buildPayload();
       const riskLevel = severityToRiskLevel(selectedSeverity);
       const lowRisk = riskLevel === 'low';
-      const steps = lowRisk ? resolveDiySteps(category) : [];
+      const steps = lowRisk
+        ? Array.from(new Set(selectedCategories.flatMap((item) => resolveDiySteps(item))))
+        : [];
       const summary = problem.trim()
         ? problem.trim()
-        : `${category.toUpperCase()} issue reported from guided answers.`;
+        : `${selectedCategories.map((item) => item.toUpperCase()).join(', ')} issue reported from guided answers.`;
       const recommendation = lowRisk
         ? 'Low-risk issue detected. You can try DIY steps first.'
         : 'DIY is not recommended for this risk level. Raise issue to garage for safe handling.';
@@ -472,6 +494,7 @@ export function ServiceIntakeFlow({
         diySteps: steps,
       });
       const { issueId } = await submitServiceIntake(payload);
+      setQuestionPopupOpen(false);
       router.push(`/user/quotes-bookings/${issueId}`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Failed to generate diagnosis report.');
@@ -487,6 +510,7 @@ export function ServiceIntakeFlow({
       const { payload } = await buildPayload();
       const { issueId } = await submitServiceIntake(payload);
       await raiseIssueToGarageApi(issueId);
+      setQuestionPopupOpen(false);
       router.push(`/user/quotes-bookings/${issueId}`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Failed to submit request.');
@@ -513,7 +537,7 @@ export function ServiceIntakeFlow({
       </div>
 
       <section className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl p-4 sm:p-6 md:p-8">
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">
           <UserTopLogoHeader sidebar={headerSidebar} />
 
           <Card className="mt-3 sm:mt-4 overflow-hidden rounded-2xl border-[#dbe4f1] bg-white shadow-none sm:rounded-3xl">
@@ -538,11 +562,15 @@ export function ServiceIntakeFlow({
               {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
 
               {!loading ? (
-                <SectionCard icon={Wrench} title="1. Select issue category" subtitle="Choose the problem category to continue.">
-                  <OptionChips
+                <SectionCard icon={Wrench} title="1. Select issue categories" subtitle="Choose one or more issue categories to continue.">
+                  <MultiOptionChips
                     values={categoryOptions}
-                    value={category}
-                    onPick={setCategory}
+                    valuesSelected={selectedCategories}
+                    onToggle={(value) =>
+                      setSelectedCategories((prev) =>
+                        prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+                      )
+                    }
                   />
                   <textarea
                     value={problem}
@@ -552,9 +580,14 @@ export function ServiceIntakeFlow({
                   />
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <Badge variant="outline" className="w-fit border-[#cddaf0] text-[#335889]">
-                      Detected category: {category.toUpperCase()}
+                      Selected categories: {selectedCategories.length > 0 ? selectedCategories.map((item) => item.toUpperCase()).join(', ') : 'NONE'}
                     </Badge>
-                    <Button type="button" onClick={() => void handleIssueSubmit()} disabled={dynamicQuestionsLoading || !category.trim()} className="w-full sm:w-auto">
+                    <Button
+                      type="button"
+                      onClick={() => void handleIssueSubmit()}
+                      disabled={dynamicQuestionsLoading || selectedCategories.length === 0}
+                      className="w-full sm:w-auto"
+                    >
                       {dynamicQuestionsLoading ? 'Loading Questions...' : 'Continue'}
                     </Button>
                   </div>
@@ -582,9 +615,14 @@ export function ServiceIntakeFlow({
                   <div className="grid gap-3 md:grid-cols-2">
                     {dynamicQuestions.map((question) => (
                       <div key={question.id} className="rounded-xl border border-[#dbe5f3] bg-[#fbfdff] p-3">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {question.label} {question.required ? <span className="text-red-500">*</span> : null}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {question.label} {question.required ? <span className="text-red-500">*</span> : null}
+                          </p>
+                          <Badge variant="outline" className="border-[#d3deef] bg-white text-[10px] uppercase text-[#45628b]">
+                            {question.category}
+                          </Badge>
+                        </div>
                         <div className="mt-2">
                           <QuestionInput
                             question={question}
@@ -848,6 +886,35 @@ function OptionChips({
           {item.label}
         </Button>
       ))}
+    </div>
+  );
+}
+
+function MultiOptionChips({
+  values,
+  valuesSelected,
+  onToggle,
+}: {
+  values: Array<{ value: string; label: string }>;
+  valuesSelected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {values.map((item) => {
+        const selected = valuesSelected.includes(item.value);
+        return (
+          <Button
+            key={item.value}
+            type="button"
+            variant={selected ? 'default' : 'outline'}
+            className="h-9 rounded-lg"
+            onClick={() => onToggle(item.value)}
+          >
+            {item.label}
+          </Button>
+        );
+      })}
     </div>
   );
 }

@@ -36,7 +36,7 @@ async function getSessionRole(req: NextRequest) {
       : null;
 
   if (!accessToken) {
-    if (refreshToken && roleFromCookie) return roleFromCookie;
+    if (refreshToken && roleFromCookie) return { role: roleFromCookie, garageApproved: undefined as boolean | undefined };
     return null;
   }
 
@@ -50,13 +50,20 @@ async function getSessionRole(req: NextRequest) {
       cache: 'no-store',
     });
     if (!response.ok) {
-      if (refreshToken && roleFromCookie) return roleFromCookie;
+      if (refreshToken && roleFromCookie) return { role: roleFromCookie, garageApproved: undefined as boolean | undefined };
       return null;
     }
     const data = (await response.json()) as {
-      user?: { roleCode?: 'user' | 'garage' | 'vendor' | 'admin' };
+      user?: {
+        roleCode?: 'user' | 'garage' | 'vendor' | 'admin';
+        garageApproved?: boolean;
+      };
     };
-    return data.user?.roleCode ?? null;
+    if (!data.user?.roleCode) return null;
+    return {
+      role: data.user.roleCode,
+      garageApproved: data.user.garageApproved,
+    };
   } catch {
     return null;
   }
@@ -73,7 +80,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const role = await getSessionRole(req);
+  const sessionInfo = await getSessionRole(req);
+  const role = sessionInfo?.role ?? null;
   const isAuthed = Boolean(role);
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
   const rolePath = rolePrefixes.find((prefix) => pathname.startsWith(prefix));
@@ -94,6 +102,12 @@ export async function middleware(req: NextRequest) {
     const requiredRole = rolePath.slice(1);
     if (requiredRole !== role) {
       return withNoStore(NextResponse.redirect(new URL(`/${role}/dashboard`, req.url)));
+    }
+    if (role === 'garage') {
+      const isProfileRoute = pathname === '/garage/profile' || pathname.startsWith('/garage/profile/');
+      if (sessionInfo?.garageApproved === false && !isProfileRoute) {
+        return withNoStore(NextResponse.redirect(new URL('/garage/profile', req.url)));
+      }
     }
   }
 

@@ -269,3 +269,108 @@ usersRouter.post('/support-tickets', requireAuth, requireRole('user'), async (re
     return next(error);
   }
 });
+
+// Get user's issue requests with quotes
+usersRouter.get('/issue-requests-with-quotes', requireAuth, requireRole('user'), async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    
+    const result = await query(`
+      SELECT 
+        ir.id,
+        ir.customer_user_id,
+        ir.vehicle_id,
+        ir.summary,
+        ir.status,
+        ir.created_at,
+        CONCAT(v.make, ' ', v.model, ' ', v.year) as vehicle_label
+      FROM issue_requests ir
+      JOIN vehicles v ON ir.vehicle_id = v.id
+      WHERE ir.customer_user_id = $1::uuid
+      ORDER BY ir.created_at DESC
+    `, [userId]);
+
+    const issueRequests = await Promise.all(result.rows.map(async (ir) => {
+      const quotesResult = await query(`
+        SELECT 
+          q.id,
+          q.issue_request_id,
+          q.garage_id,
+          COALESCE(g.business_name, 'Garage Quote') as garage_name,
+          g.trust_score as garage_rating,
+          q.parts_cost,
+          q.labor_cost,
+          q.total_cost,
+          q.eta_note as description,
+          q.comparison_label,
+          q.status,
+          q.created_at
+        FROM quotes q
+        LEFT JOIN garages g ON q.garage_id = g.id
+        WHERE q.issue_request_id = $1::uuid
+        ORDER BY q.created_at ASC
+      `, [ir.id]);
+
+      return {
+        ...ir,
+        quotes: quotesResult.rows,
+      };
+    }));
+
+    return res.json({ issue_requests: issueRequests });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Accept a quote
+usersRouter.post('/quotes/:quoteId/accept', requireAuth, requireRole('user'), async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    const { quoteId } = req.params;
+
+    // Get the quote and issue request
+    const quoteResult = await query(`
+      SELECT q.id, q.issue_request_id, q.garage_id, ir.customer_user_id
+      FROM quotes q
+      JOIN issue_requests ir ON q.issue_request_id = ir.id
+      WHERE q.id = $1::uuid
+    `, [quoteId]);
+
+    if (quoteResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Quote not found' });
+    }
+
+    const quote = quoteResult.rows[0];
+    
+    // Verify the quote belongs to the user's issue request
+    if (quote.customer_user_id !== userId) {
+      return res.status(403).json({ message: 'You can only accept quotes for your own issue requests' });
+    }
+
+    // Update quote status to accepted
+    await query(`
+      UPDATE quotes
+      SET status = 'accepted'
+      WHERE id = $1::uuid
+    `, [quoteId]);
+
+    // Update issue request status
+    await query(`
+      UPDATE issue_requests
+      SET status = 'quote_accepted'
+      WHERE id = $1::uuid
+    `, [quote.issue_request_id]);
+
+    // Reject all other quotes for this issue request
+    await query(`
+      UPDATE quotes
+      SET status = 'rejected'
+      WHERE issue_request_id = $1::uuid AND id != $2::uuid
+    `, [quote.issue_request_id, quoteId]);
+
+    return res.json({ message: 'Quote accepted successfully' });
+  } catch (error) {
+    return next(error);
+  }
+});

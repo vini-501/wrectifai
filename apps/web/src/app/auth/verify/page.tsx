@@ -29,6 +29,7 @@ export default async function VerifyPage({
 
   return (
     <AuthShell
+      hideHero
       appName={ui.appName}
       authModeLabel=""
       heroKicker={ui.hero.kicker}

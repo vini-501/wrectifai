@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 type AuthShellProps = {
   hideHeroOnMobile?: boolean;
+  hideHero?: boolean;
   appName: string;
   authModeLabel: string;
   heroKicker: string;
@@ -12,6 +13,7 @@ type AuthShellProps = {
 
 export function AuthShell({
   hideHeroOnMobile = false,
+  hideHero = false,
   appName,
   authModeLabel,
   heroKicker,
@@ -19,9 +21,13 @@ export function AuthShell({
   heroBody,
   rightPane,
 }: AuthShellProps) {
-  const asideClassName = hideHeroOnMobile
+  const asideClassName = hideHero
+    ? 'hidden'
+    : hideHeroOnMobile
     ? 'hidden relative min-h-[520px] overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:block'
     : 'relative min-h-[520px] overflow-hidden bg-sidebar p-12 text-sidebar-foreground';
+
+  const gridClassName = hideHero ? 'grid-cols-1' : 'lg:grid-cols-2';
 
   return (
     <main className="min-h-screen bg-background">
@@ -31,7 +37,7 @@ export function AuthShell({
           <p className="text-sm text-muted-foreground">{authModeLabel}</p>
         </header>
 
-        <section className="grid gap-0 overflow-hidden rounded-xl surface-low shadow-ambient lg:grid-cols-2">
+        <section className={`grid gap-0 overflow-hidden rounded-xl surface-low shadow-ambient ${gridClassName}`}>
           <aside className={asideClassName}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(72,148,226,0.25),transparent_45%)]" />
             <div className="relative z-10">

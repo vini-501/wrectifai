@@ -63,7 +63,7 @@ export function SupportClient({ sidebar }: Props) {
         <UserSidebar activeItem="support" content={sidebar} />
       </div>
       <section className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl p-6">
+        <div className="mx-auto w-full max-w-7xl p-6">
           <UserTopLogoHeader sidebar={sidebar} />
           <Card className="mb-6">
             <CardHeader>

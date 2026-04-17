@@ -52,6 +52,21 @@ export function ensureDbBootstrap() {
     `);
 
     await query(`
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS business_hours TEXT;
+    `);
+
+    await query(`
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS specializations JSONB;
+    `);
+
+    await query(`
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS certifications JSONB;
+    `);
+
+    await query(`
       CREATE TABLE IF NOT EXISTS roles (
         id UUID PRIMARY KEY,
         code TEXT UNIQUE NOT NULL,
@@ -213,12 +228,30 @@ export function ensureDbBootstrap() {
     `);
 
     await query(`
+      CREATE TABLE IF NOT EXISTS garages (
+        id UUID PRIMARY KEY,
+        owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        business_name TEXT NOT NULL,
+        address_line TEXT,
+        city TEXT,
+        state TEXT,
+        postal_code TEXT,
+        specializations JSONB,
+        business_hours JSONB,
+        verification_status TEXT DEFAULT 'pending',
+        is_approved BOOLEAN DEFAULT FALSE,
+        trust_score NUMERIC(3,2),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (owner_user_id)
+      );
+    `);
+
+    await query(`
       CREATE TABLE IF NOT EXISTS quotes (
         id UUID PRIMARY KEY,
         issue_request_id UUID NOT NULL REFERENCES issue_requests(id) ON DELETE CASCADE,
-        garage_name TEXT NOT NULL,
-        garage_rating NUMERIC(3,2),
-        distance_miles NUMERIC(6,2),
+        garage_id UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
         parts_cost NUMERIC(12,2) NOT NULL,
         labor_cost NUMERIC(12,2) NOT NULL,
         total_cost NUMERIC(12,2) NOT NULL,
@@ -240,7 +273,7 @@ export function ensureDbBootstrap() {
         id UUID PRIMARY KEY,
         quote_id UUID UNIQUE NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
         customer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        garage_name TEXT NOT NULL,
+        garage_id UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
         appointment_time TIMESTAMPTZ NOT NULL,
         checkin_mode TEXT NOT NULL DEFAULT 'self_checkin',
         customer_note TEXT,
@@ -249,6 +282,12 @@ export function ensureDbBootstrap() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    // Ensure garage_id column exists for existing databases
+    await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS garage_id UUID REFERENCES garages(id) ON DELETE CASCADE`);
+    await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checkin_mode TEXT DEFAULT 'self_checkin'`);
+    await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+    await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_bookings_user_created
@@ -377,6 +416,25 @@ export function ensureDbBootstrap() {
         value_json JSONB NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS garage_services (
+        id UUID PRIMARY KEY,
+        garage_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        price NUMERIC(12,2) NOT NULL,
+        description TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_garage_services_garage
+      ON garage_services(garage_user_id, created_at DESC);
     `);
 
     await query(`
@@ -1001,23 +1059,20 @@ async function seedDefaults() {
       SELECT *
       FROM (
         VALUES
-          ('Precision Auto Works', 4.8::numeric, 2.4::numeric, 145::numeric, 90::numeric, 1.00::numeric, 1.00::numeric, 'Can start tomorrow', 'below_market'),
-          ('CarMotive Pro Garage', 4.6::numeric, 4.1::numeric, 165::numeric, 110::numeric, 1.08::numeric, 1.10::numeric, 'Slot in 24 hours', 'fair'),
-          ('MetroDrive Service Hub', 4.9::numeric, 6.8::numeric, 188::numeric, 125::numeric, 1.18::numeric, 1.16::numeric, 'Same-day premium slot', 'above_market')
-      ) AS q(garage_name, garage_rating, distance_miles, base_parts_cost, base_labor_cost, parts_vendor_factor, labor_vendor_factor, eta_note, comparison_label)
+          ('Precision Auto Works', 2.4::numeric, 145::numeric, 90::numeric, 1.00::numeric, 1.00::numeric, 'Can start tomorrow', 'below_market'),
+          ('CarMotive Pro Garage', 4.1::numeric, 165::numeric, 110::numeric, 1.08::numeric, 1.10::numeric, 'Slot in 24 hours', 'fair'),
+          ('MetroDrive Service Hub', 6.8::numeric, 188::numeric, 125::numeric, 1.18::numeric, 1.16::numeric, 'Same-day premium slot', 'above_market')
+      ) AS q(garage_name, distance_miles, base_parts_cost, base_labor_cost, parts_vendor_factor, labor_vendor_factor, eta_note, comparison_label)
+    ),
+    garage_mapping AS (
+      SELECT
+        qt.garage_name,
+        g.id AS garage_id
+      FROM quote_templates qt
+      LEFT JOIN garages g ON g.business_name = qt.garage_name
     ),
     prepared_quotes AS (
       SELECT
-        (
-          qt.garage_name || ' - ' ||
-          CASE
-            WHEN ti.summary ILIKE '%brake%' THEN 'Brake'
-            WHEN ti.summary ILIKE '%engine%' OR ti.summary ILIKE '%knock%' THEN 'Engine'
-            WHEN ti.summary ILIKE '%ac%' OR ti.summary ILIKE '%cool%' THEN 'AC'
-            WHEN ti.summary ILIKE '%oil%' OR ti.summary ILIKE '%maintenance%' THEN 'Maintenance'
-            ELSE 'General'
-          END
-        ) AS resolved_garage_name,
         (
           SUBSTRING(md5('seed-quote-' || ti.issue_request_id::text || '-' || (
             qt.garage_name || '-' ||
@@ -1071,18 +1126,7 @@ async function seedDefaults() {
           )), 21, 12)
         )::uuid AS id,
         ti.issue_request_id,
-        (
-          qt.garage_name || ' - ' ||
-          CASE
-            WHEN ti.summary ILIKE '%brake%' THEN 'Brake'
-            WHEN ti.summary ILIKE '%engine%' OR ti.summary ILIKE '%knock%' THEN 'Engine'
-            WHEN ti.summary ILIKE '%ac%' OR ti.summary ILIKE '%cool%' THEN 'AC'
-            WHEN ti.summary ILIKE '%oil%' OR ti.summary ILIKE '%maintenance%' THEN 'Maintenance'
-            ELSE 'General'
-          END
-        ) AS garage_name,
-        qt.garage_rating,
-        qt.distance_miles,
+        gm.garage_id,
         ROUND(
           qt.base_parts_cost
           * CASE
@@ -1132,13 +1176,13 @@ async function seedDefaults() {
         qt.comparison_label
       FROM target_issues ti
       CROSS JOIN quote_templates qt
+      LEFT JOIN garage_mapping gm ON gm.garage_name = qt.garage_name
+      WHERE gm.garage_id IS NOT NULL
     )
     INSERT INTO quotes (
       id,
       issue_request_id,
-      garage_name,
-      garage_rating,
-      distance_miles,
+      garage_id,
       parts_cost,
       labor_cost,
       total_cost,
@@ -1150,9 +1194,7 @@ async function seedDefaults() {
     SELECT
       pq.id,
       pq.issue_request_id,
-      pq.garage_name,
-      pq.garage_rating,
-      pq.distance_miles,
+      pq.garage_id,
       pq.parts_cost,
       pq.labor_cost,
       pq.total_cost,
@@ -1165,7 +1207,7 @@ async function seedDefaults() {
       SELECT 1
       FROM quotes q
       WHERE q.issue_request_id = pq.issue_request_id
-        AND q.garage_name = pq.garage_name
+        AND q.garage_id = pq.garage_id
     )
     ON CONFLICT (id) DO NOTHING;
   `);

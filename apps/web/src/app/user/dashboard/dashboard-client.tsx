@@ -33,7 +33,7 @@ export function DashboardClient({ sidebar, content, appLogoUrl }: Props) {
       </div>
 
       <section className="flex-1 overflow-y-auto bg-[#f1f3f8]">
-        <div className="mx-auto max-w-5xl p-4 sm:p-6 md:p-8">
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">
           <UserTopLogoHeader sidebar={headerSidebar} />
 
           <div className="mt-4 sm:mt-6 space-y-2">

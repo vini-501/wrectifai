@@ -11,6 +11,7 @@ export default async function VendorRegisterPage() {
   return (
     <AuthShell
       hideHeroOnMobile
+      hideHero
       appName={ui.appName}
       authModeLabel={ui.authModeLabel}
       heroKicker={ui.hero.kicker}

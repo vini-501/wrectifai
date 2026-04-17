@@ -346,11 +346,13 @@ marketplaceRouter.get('/issues/:issueId/quotes', async (req, res, next) => {
       status: string;
     }>(
       `
-        SELECT id, garage_name, garage_rating::text, distance_miles::text, parts_cost::text,
-               labor_cost::text, total_cost::text, eta_note, comparison_label, status
-        FROM quotes
-        WHERE issue_request_id = $1
-        ORDER BY total_cost ASC, created_at ASC
+        SELECT q.id, g.business_name as garage_name, g.trust_score::text as garage_rating,
+               '0' as distance_miles, q.parts_cost::text, q.labor_cost::text,
+               q.total_cost::text, q.eta_note, q.comparison_label, q.status
+        FROM quotes q
+        LEFT JOIN garages g ON g.id = q.garage_id
+        WHERE q.issue_request_id = $1
+        ORDER BY q.total_cost ASC, q.created_at ASC
       `,
       [issueId]
     );
@@ -387,21 +389,31 @@ marketplaceRouter.post('/quotes/:quoteId/select', async (req, res, next) => {
       quote_id: string;
       issue_request_id: string;
       garage_name: string;
+      garage_id: string;
       total_cost: string;
       has_booking: string;
+      existing_booking_id: string | null;
     }>(
       `
         SELECT
           q.id AS quote_id,
           q.issue_request_id,
-          q.garage_name,
+          q.garage_id,
+          COALESCE(g.business_name, 'Unknown Garage') as garage_name,
           q.total_cost::text,
           (
             SELECT COUNT(*)::text
             FROM bookings b
             WHERE b.quote_id = q.id
-          ) AS has_booking
+          ) AS has_booking,
+          (
+            SELECT b.id::text
+            FROM bookings b
+            WHERE b.quote_id = q.id
+            LIMIT 1
+          ) AS existing_booking_id
         FROM quotes q
+        LEFT JOIN garages g ON g.id = q.garage_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         WHERE q.id = $1 AND i.customer_user_id = $2
         LIMIT 1
@@ -438,21 +450,108 @@ marketplaceRouter.post('/quotes/:quoteId/select', async (req, res, next) => {
     ]);
 
     if (Number(row.has_booking) > 0) {
-      return res.json({ message: 'Quote selected' });
+      return res.json({ message: 'Quote selected', bookingId: row.existing_booking_id });
     }
 
     const bookingId = crypto.randomUUID();
-    await query(
+    const garageNameColumnCheck = await query<{ exists: boolean }>(
       `
-        INSERT INTO bookings (
-          id, quote_id, customer_user_id, garage_name, appointment_time, checkin_mode, status
-        )
-        VALUES ($1,$2,$3,$4,NOW() + INTERVAL '1 day','self_checkin','booked')
-      `,
-      [bookingId, quoteId, userId, row.garage_name]
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookings'
+            AND column_name = 'garage_name'
+        ) AS exists
+      `
     );
+    const hasGarageNameColumn = garageNameColumnCheck.rows[0]?.exists === true;
+
+    if (hasGarageNameColumn) {
+      await query(
+        `
+          INSERT INTO bookings (
+            id, quote_id, customer_user_id, garage_id, garage_name, appointment_time, checkin_mode, status
+          )
+          VALUES ($1,$2,$3,$4,$5,NOW() + INTERVAL '1 day','self_checkin','booked')
+        `,
+        [bookingId, quoteId, userId, row.garage_id, row.garage_name]
+      );
+    } else {
+      await query(
+        `
+          INSERT INTO bookings (
+            id, quote_id, customer_user_id, garage_id, appointment_time, checkin_mode, status
+          )
+          VALUES ($1,$2,$3,$4,NOW() + INTERVAL '1 day','self_checkin','booked')
+        `,
+        [bookingId, quoteId, userId, row.garage_id]
+      );
+    }
 
     return res.json({ message: 'Quote selected and booking created', bookingId });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+marketplaceRouter.post('/quotes/:quoteId/cancel', async (req, res, next) => {
+  try {
+    const userId = req.authUser!.userId;
+    const { quoteId } = req.params;
+
+    const owned = await query<{
+      quote_id: string;
+      issue_request_id: string;
+      status: string;
+      booking_id: string | null;
+    }>(
+      `
+        SELECT
+          q.id AS quote_id,
+          q.issue_request_id,
+          q.status,
+          (
+            SELECT b.id::text
+            FROM bookings b
+            WHERE b.quote_id = q.id
+            LIMIT 1
+          ) AS booking_id
+        FROM quotes q
+        INNER JOIN issue_requests i ON i.id = q.issue_request_id
+        WHERE q.id = $1 AND i.customer_user_id = $2
+        LIMIT 1
+      `,
+      [quoteId, userId]
+    );
+
+    const row = owned.rows[0];
+    if (!row) {
+      return res.status(404).json({ message: 'Quote not found' });
+    }
+
+    if (row.status !== 'selected') {
+      return res.status(409).json({ message: 'Only an accepted quote can be cancelled' });
+    }
+
+    if (row.booking_id) {
+      const paid = await query<{ id: string }>(
+        `SELECT id FROM payments WHERE booking_id = $1 AND status = 'paid' LIMIT 1`,
+        [row.booking_id]
+      );
+      if (paid.rows[0]) {
+        return res.status(409).json({ message: 'Cannot cancel accepted quote after payment' });
+      }
+
+      await query(`DELETE FROM bookings WHERE id = $1`, [row.booking_id]);
+    }
+
+    await query(`UPDATE quotes SET status = 'pending' WHERE issue_request_id = $1`, [row.issue_request_id]);
+    await query(`UPDATE issue_requests SET status = 'quotes_pending', updated_at = NOW() WHERE id = $1`, [
+      row.issue_request_id,
+    ]);
+
+    return res.json({ message: 'Accepted quote cancelled successfully' });
   } catch (error) {
     return next(error);
   }
@@ -478,7 +577,7 @@ marketplaceRouter.get('/bookings', async (req, res, next) => {
         SELECT
           b.id,
           b.quote_id,
-          b.garage_name,
+          g.business_name as garage_name,
           b.appointment_time,
           b.checkin_mode,
           b.status,
@@ -489,6 +588,7 @@ marketplaceRouter.get('/bookings', async (req, res, next) => {
           v.year
         FROM bookings b
         INNER JOIN quotes q ON q.id = b.quote_id
+        INNER JOIN garages g ON g.id = b.garage_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id
         LEFT JOIN payments p ON p.booking_id = b.id

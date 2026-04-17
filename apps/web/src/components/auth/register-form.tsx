@@ -28,6 +28,7 @@ type RegisterFormProps = {
   unexpectedErrorMessage: string;
 };
 
+
 export function RegisterForm({
   initialRoleCode,
   title,
@@ -204,30 +205,34 @@ export function RegisterForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="group relative h-11 w-full"
-          onClick={() => void onSocialLogin('google')}
-        >
-          <GoogleIcon />
-          {continueWithGoogleLabel}
+        <div className="group relative">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            disabled
+          >
+            <GoogleIcon />
+            {continueWithGoogleLabel}
+          </Button>
           <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
             Feature coming soon
           </span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="group relative h-11 w-full"
-          onClick={() => void onSocialLogin('apple')}
-        >
-          <AppleIcon />
-          {continueWithAppleLabel}
+        </div>
+        <div className="group relative">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            disabled
+          >
+            <AppleIcon />
+            {continueWithAppleLabel}
+          </Button>
           <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
             Feature coming soon
           </span>
-        </Button>
+        </div>
       </div>
     </div>
   );

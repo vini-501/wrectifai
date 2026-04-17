@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  cancelSelectedQuote,
   type IssueDetail,
   type MockQuote,
   type UserQuotesBookingsContent,
@@ -54,7 +55,9 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [acceptingQuoteId, setAcceptingQuoteId] = useState<string | null>(null);
+  const [cancellingQuote, setCancellingQuote] = useState(false);
   const [raisingToGarage, setRaisingToGarage] = useState(false);
+  const [quoteAcceptedOpen, setQuoteAcceptedOpen] = useState(false);
 
   const [selectedCompareIds, setSelectedCompareIds] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -87,7 +90,7 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
     [quotes, selectedCompareIds]
   );
   const acceptedQuote = useMemo(
-    () => quotes.find((quote) => quote.status === 'selected') ?? null,
+    () => quotes.find((quote) => quote.status === 'selected' || quote.status === 'accepted') ?? null,
     [quotes]
   );
   const isIssueQuoteAccepted = useMemo(
@@ -176,7 +179,7 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
         }))
       );
       setIssue((prev) => (prev ? { ...prev, status: 'quote_accepted' } : prev));
-      router.push('/user/payments');
+      setQuoteAcceptedOpen(true);
     } catch (acceptError) {
       setError(acceptError instanceof Error ? acceptError.message : 'Failed to accept quote.');
     } finally {
@@ -199,6 +202,26 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
       setError(raiseError instanceof Error ? raiseError.message : 'Failed to raise issue to garage.');
     } finally {
       setRaisingToGarage(false);
+    }
+  }
+
+  async function handleCancelAcceptedQuote() {
+    if (!acceptedQuote) return;
+    try {
+      setCancellingQuote(true);
+      setError(null);
+      await cancelSelectedQuote(acceptedQuote.id);
+      const [issueDetail, issueQuotes] = await Promise.all([
+        fetchIssueDetail(issueId),
+        fetchIssueQuotes(issueId),
+      ]);
+      setIssue(issueDetail);
+      setQuotes(issueQuotes);
+      setSelectedCompareIds([]);
+    } catch (cancelError) {
+      setError(cancelError instanceof Error ? cancelError.message : 'Failed to cancel accepted quote.');
+    } finally {
+      setCancellingQuote(false);
     }
   }
 
@@ -232,15 +255,28 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
                 <p className="mt-2 text-sm font-semibold text-emerald-700">Quote accepted for this issue.</p>
               ) : null}
             </div>
-            <Button
-              type="button"
-              onClick={() => setCompareOpen(true)}
-              disabled={selectedCompareIds.length !== 2}
-              className="h-10 rounded-xl bg-[#0f93de] px-4 text-sm text-white hover:bg-[#0d82c4] disabled:bg-slate-300"
-            >
-              <ArrowLeftRight className="mr-2 h-4 w-4" />
-              Compare ({selectedCompareIds.length}/2)
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => setCompareOpen(true)}
+                disabled={selectedCompareIds.length !== 2}
+                className="h-10 rounded-xl bg-[#0f93de] px-4 text-sm text-white hover:bg-[#0d82c4] disabled:bg-slate-300"
+              >
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Compare ({selectedCompareIds.length}/2)
+              </Button>
+              {acceptedQuote ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleCancelAcceptedQuote()}
+                  disabled={cancellingQuote}
+                  className="h-10 rounded-xl border-red-200 text-sm text-red-700 hover:bg-red-50"
+                >
+                  {cancellingQuote ? 'Cancelling...' : 'Cancel Accepted Quote'}
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           {isDiagnosisIssue ? (
@@ -305,7 +341,7 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
               {quotes.map((quote) => {
                 const selectedForCompare = selectedCompareIds.includes(quote.id);
                 const compareDisabled = selectedCompareIds.length >= 2 && !selectedForCompare;
-                const isSelectedQuote = quote.status === 'selected';
+                const isSelectedQuote = quote.status === 'selected' || quote.status === 'accepted';
                 const disableAccept =
                   acceptingQuoteId === quote.id ||
                   (isIssueQuoteAccepted && !isSelectedQuote);
@@ -443,11 +479,11 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
                           type="button"
                           className="h-9 rounded-lg bg-[#0f93de] px-4 text-sm text-white hover:bg-[#0d82c4]"
                           onClick={() => void handleAcceptQuote(quote.id)}
-                          disabled={acceptingQuoteId === quote.id || (isIssueQuoteAccepted && quote.status !== 'selected')}
+                          disabled={acceptingQuoteId === quote.id || (isIssueQuoteAccepted && quote.status !== 'selected' && quote.status !== 'accepted')}
                         >
                           {acceptingQuoteId === quote.id
                             ? 'Accepting...'
-                            : quote.status === 'selected'
+                            : quote.status === 'selected' || quote.status === 'accepted'
                               ? 'Quote Accepted'
                               : 'Accept This Quote'}
                         </Button>
@@ -463,6 +499,26 @@ export function IssueQuotesClient({ sidebar, content: _initialContent, issueId }
           ) : (
             <p className="text-sm text-slate-500">Select exactly two quotes to compare.</p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quoteAcceptedOpen} onOpenChange={setQuoteAcceptedOpen}>
+        <DialogContent className="max-w-md border-[#d9e2ef] bg-white sm:rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">Quote Accepted</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Your quote has been accepted successfully.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              className="h-9 rounded-lg bg-[#0f93de] px-4 text-sm text-white hover:bg-[#0d82c4]"
+              onClick={() => setQuoteAcceptedOpen(false)}
+            >
+              OK
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

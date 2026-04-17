@@ -92,15 +92,15 @@ export function PaymentsClient({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard label={content.stats.totalSpentLabel} value={`$${totalSpent.toFixed(2)}`} icon={Receipt} color="bg-blue-500" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <StatCard label={content.stats.totalSpentLabel} value={`$${totalSpent.toFixed(2)}`} icon={Receipt} color="bg-gradient-to-br from-blue-500 to-blue-600" />
             <StatCard
               label={content.stats.outstandingLabel}
               value={transactions.some((t) => t.status === 'pending') ? 'Pending' : '$0.00'}
               icon={AlertCircle}
-              color="bg-orange-500"
+              color="bg-gradient-to-br from-orange-500 to-orange-600"
             />
-            <StatCard label={content.stats.creditsLabel} value={`${paidCount}`} icon={CheckCircle2} color="bg-emerald-500" />
+            <StatCard label={content.stats.creditsLabel} value={`${paidCount}`} icon={CheckCircle2} color="bg-gradient-to-br from-emerald-500 to-emerald-600" />
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-10">
@@ -118,22 +118,22 @@ export function PaymentsClient({
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200/60 rounded-[1.5rem] overflow-hidden shadow-lg shadow-slate-200/50">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="border-b border-slate-50 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                        <th className="px-8 py-5">{content.transactions.table.date}</th>
-                        <th className="px-8 py-5">{content.transactions.table.service}</th>
-                        <th className="px-8 py-5">{content.transactions.table.amount}</th>
-                        <th className="px-8 py-5 text-right">{content.transactions.table.status}</th>
+                      <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        <th className="px-6 py-4 sm:px-8 sm:py-5">{content.transactions.table.date}</th>
+                        <th className="px-6 py-4 sm:px-8 sm:py-5">{content.transactions.table.service}</th>
+                        <th className="px-6 py-4 sm:px-8 sm:py-5">{content.transactions.table.amount}</th>
+                        <th className="px-6 py-4 sm:px-8 sm:py-5 text-right">{content.transactions.table.status}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-slate-100">
                       {loading ? (
                         <tr>
-                          <td colSpan={4} className="px-8 py-10 text-center">
-                            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                          <td colSpan={4} className="px-6 py-12 sm:px-8 text-center">
+                            <span className="inline-flex items-center gap-2 text-sm text-slate-400">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               Loading transactions...
                             </span>
@@ -141,22 +141,25 @@ export function PaymentsClient({
                         </tr>
                       ) : filteredTransactions.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-8 py-20 text-center">
-                            <p className="text-slate-400 font-bold uppercase tracking-widest">No matching transactions found</p>
+                          <td colSpan={4} className="px-6 py-20 sm:px-8 text-center">
+                            <div className="flex flex-col items-center gap-3">
+                              <Receipt className="h-12 w-12 text-slate-200" />
+                              <p className="text-slate-400 font-semibold uppercase tracking-wider">No matching transactions found</p>
+                            </div>
                           </td>
                         </tr>
                       ) : (
                         filteredTransactions.map((tx) => (
-                          <tr key={tx.id} className="group hover:bg-slate-50/50 transition-colors">
-                            <td className="px-8 py-6">
-                              <p className="text-sm font-bold text-slate-600 group-hover:text-slate-900">{formatDate(tx.date)}</p>
+                          <tr key={tx.id} className="group hover:bg-slate-50/80 transition-colors">
+                            <td className="px-6 py-5 sm:px-8 sm:py-6">
+                              <p className="text-sm font-semibold text-slate-700 group-hover:text-slate-900">{formatDate(tx.date)}</p>
                               <p className="text-[10px] font-medium text-slate-400 mt-0.5">{tx.id.toUpperCase()}</p>
                             </td>
-                            <td className="px-8 py-6">
-                              <p className="text-sm font-black text-slate-900">{tx.service}</p>
+                            <td className="px-6 py-5 sm:px-8 sm:py-6">
+                              <p className="text-sm font-semibold text-slate-900">{tx.service}</p>
                             </td>
-                            <td className="px-8 py-6 text-sm font-black text-slate-900">${tx.amount.toFixed(2)}</td>
-                            <td className="px-8 py-6 text-right">
+                            <td className="px-6 py-5 sm:px-8 sm:py-6 text-sm font-semibold text-slate-900">${tx.amount.toFixed(2)}</td>
+                            <td className="px-6 py-5 sm:px-8 sm:py-6 text-right">
                               <StatusBadge status={tx.status} />
                             </td>
                           </tr>
@@ -165,32 +168,41 @@ export function PaymentsClient({
                     </tbody>
                   </table>
                 </div>
-                <div className="p-6 border-t border-slate-50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Showing {filteredTransactions.length} results
+                <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/30">
+                  <p className="text-xs font-medium text-slate-500">
+                    Showing {filteredTransactions.length} result{filteredTransactions.length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-8">
-              <Card className="rounded-[2.5rem] border-none bg-slate-900 p-8 shadow-xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full translate-x-10 -translate-y-10" />
-                <h3 className="text-xs font-black uppercase text-white/30 tracking-[0.2em] mb-6">{content.methods.title}</h3>
-                <div className="space-y-4 relative z-10">
+            <div className="space-y-6 sm:space-y-8">
+              <Card className="rounded-[1.5rem] border border-slate-200/60 bg-gradient-to-br from-slate-900 to-slate-800 p-6 sm:p-8 shadow-xl shadow-slate-900/20 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full translate-x-12 -translate-y-12 blur-2xl" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 rounded-full -translate-x-8 translate-y-8 blur-2xl" />
+                <h3 className="text-xs font-bold uppercase text-white/40 tracking-[0.15em] mb-6 relative z-10">{content.methods.title}</h3>
+                <div className="space-y-3 sm:space-y-4 relative z-10">
                   {methodUsage.length === 0 ? (
-                    <p className="text-sm text-white/60">No payment methods used yet.</p>
+                    <div className="flex flex-col items-center gap-3 py-8">
+                      <WalletCards className="h-10 w-10 text-white/30" />
+                      <p className="text-sm text-white/50">No payment methods used yet.</p>
+                    </div>
                   ) : (
                     methodUsage.map(([method, count], idx) => (
                       <div
                         key={method}
-                        className={`p-5 rounded-3xl border transition-all ${
-                          idx === 0 ? 'bg-white/5 border-primary/40' : 'bg-white/[0.02] border-white/5'
+                        className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 hover:scale-[1.02] ${
+                          idx === 0 
+                            ? 'bg-white/10 border-white/20 backdrop-blur-sm' 
+                            : 'bg-white/5 border-white/10 backdrop-blur-sm'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-black text-white uppercase">{method.replace('_', ' ')}</p>
-                          <p className="text-xs font-bold text-white/50">{count} payments</p>
+                          <p className="text-sm font-semibold text-white capitalize">{method.replace('_', ' ')}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white/60">{count}</span>
+                            <span className="text-xs text-white/40">payment{count !== 1 ? 's' : ''}</span>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -207,27 +219,28 @@ export function PaymentsClient({
 
 function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) {
   return (
-    <Card className="rounded-[2.5rem] border-white shadow-xl shadow-slate-200/50 p-8 transition-transform hover:scale-[1.02] cursor-default bg-white">
-      <div className="flex items-center gap-4 mb-4">
-        <div className={`h-12 w-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-lg`}>
+    <Card className="rounded-[2rem] border border-slate-100 shadow-lg shadow-slate-200/60 p-6 sm:p-8 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-default bg-white relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-slate-50 to-transparent rounded-full translate-x-8 -translate-y-8 opacity-50" />
+      <div className="flex items-center gap-4 mb-4 relative z-10">
+        <div className={`h-12 w-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-lg shadow-black/10`}>
           <Icon className="h-6 w-6" />
         </div>
-        <p className="text-xs font-black uppercase tracking-[0.1em] text-slate-400">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">{label}</p>
       </div>
-      <p className="text-2xl font-black text-slate-900 tracking-tighter md:text-3xl">{value}</p>
+      <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight relative z-10">{value}</p>
     </Card>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    paid: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10',
-    pending: 'bg-orange-500/10 text-orange-600 border-orange-500/10',
-    failed: 'bg-destructive/10 text-destructive border-destructive/10',
-    refunded: 'bg-slate-100 text-slate-500 border-slate-200',
+    paid: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+    pending: 'bg-orange-50 text-orange-700 border-orange-200/60',
+    failed: 'bg-red-50 text-red-700 border-red-200/60',
+    refunded: 'bg-slate-100 text-slate-600 border-slate-200/60',
   };
   return (
-    <Badge className={`rounded-lg px-3 py-1 font-bold text-[10px] uppercase tracking-widest border ${styles[status]}`}>
+    <Badge className={`rounded-lg px-3 py-1.5 font-semibold text-[10px] uppercase tracking-wider border ${styles[status]}`}>
       {status}
     </Badge>
   );

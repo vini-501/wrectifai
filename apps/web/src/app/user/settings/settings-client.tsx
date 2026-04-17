@@ -58,7 +58,7 @@ export function SettingsClient({ sidebar }: Props) {
         <UserSidebar activeItem="settings" content={sidebar} />
       </div>
       <section className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl p-6">
+        <div className="mx-auto w-full max-w-7xl p-6">
           <UserTopLogoHeader sidebar={sidebar} />
           <Card>
             <CardHeader>

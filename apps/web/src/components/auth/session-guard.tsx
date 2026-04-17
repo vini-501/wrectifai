@@ -45,13 +45,25 @@ export function SessionGuard({ requiredRole }: SessionGuardProps) {
         }
 
         const data = (await response.json()) as {
-          user?: { roleCode?: 'user' | 'garage' | 'vendor' | 'admin' };
+          user?: {
+            roleCode?: 'user' | 'garage' | 'vendor' | 'admin';
+            garageApproved?: boolean;
+          };
         };
         const role = data.user?.roleCode;
+        const garageApproved = data.user?.garageApproved;
 
         if (!role) {
           router.replace('/auth/login');
           return;
+        }
+
+        if (role === 'garage') {
+          const isProfileRoute = pathname === '/garage/profile' || pathname.startsWith('/garage/profile/');
+          if (garageApproved === false && !isProfileRoute) {
+            router.replace('/garage/profile');
+            return;
+          }
         }
 
         if (role !== requiredRole) {

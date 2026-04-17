@@ -8,6 +8,7 @@ import { paymentsRouter } from '../modules/payments/payments.routes';
 import { uiContentRouter } from '../modules/ui-content/ui-content.routes';
 import { usersRouter } from '../modules/users/users.routes';
 import { vehiclesRouter } from '../modules/vehicles/vehicles.routes';
+import garageRouter from '../modules/garage/garage.routes';
 import { getHealthStatus } from '../services/health.service';
 
 export const apiRouter = Router();
@@ -21,6 +22,7 @@ apiRouter.use('/app-config', appConfigRouter);
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/garage', garageRouter);
 apiRouter.use('/vehicles', vehiclesRouter);
 apiRouter.use('/diagnosis', diagnosisRouter);
 apiRouter.use('/marketplace', marketplaceRouter);

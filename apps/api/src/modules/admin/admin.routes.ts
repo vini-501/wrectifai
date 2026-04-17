@@ -95,10 +95,10 @@ adminRouter.get('/bookings', async (req, res, next) => {
       total_cost: string;
     }>(
       `
-        SELECT 
+        SELECT
           b.id,
           b.customer_user_id,
-          b.garage_name,
+          g.business_name as garage_name,
           b.appointment_time,
           b.status,
           b.created_at,
@@ -109,6 +109,7 @@ adminRouter.get('/bookings', async (req, res, next) => {
           q.total_cost::text
         FROM bookings b
         INNER JOIN users u ON u.id = b.customer_user_id
+        INNER JOIN garages g ON g.id = b.garage_id
         INNER JOIN quotes q ON q.id = b.quote_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id
@@ -153,9 +154,9 @@ adminRouter.get('/quotes', async (req, res, next) => {
       year: number;
     }>(
       `
-        SELECT 
+        SELECT
           q.id,
-          q.garage_name,
+          g.business_name as garage_name,
           q.parts_cost::text,
           q.labor_cost::text,
           q.total_cost::text,
@@ -167,6 +168,7 @@ adminRouter.get('/quotes', async (req, res, next) => {
           v.model,
           v.year
         FROM quotes q
+        INNER JOIN garages g ON g.id = q.garage_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN users u ON u.id = i.customer_user_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id
@@ -208,7 +210,7 @@ adminRouter.get('/payments', async (req, res, next) => {
       garage_name: string;
     }>(
       `
-        SELECT 
+        SELECT
           p.id,
           p.customer_user_id,
           p.amount::text,
@@ -217,10 +219,11 @@ adminRouter.get('/payments', async (req, res, next) => {
           p.created_at,
           p.receipt_number,
           u.full_name,
-          b.garage_name
+          g.business_name as garage_name
         FROM payments p
         INNER JOIN users u ON u.id = p.customer_user_id
         INNER JOIN bookings b ON b.id = p.booking_id
+        INNER JOIN garages g ON g.id = b.garage_id
         ORDER BY p.created_at DESC
       `
     );
@@ -290,35 +293,75 @@ adminRouter.get('/complaints', async (req, res, next) => {
 // Get pending approvals (garages and vendors)
 adminRouter.get('/approvals', async (req, res, next) => {
   try {
-    // Get users with garage or vendor role that are not active
-    const rows = await query<{
-      id: string;
+    const garageRows = await query<{
+      user_id: string;
       full_name: string;
-      email: string | null;
       phone: string;
-      role_code: string;
+      city: string | null;
+      state: string | null;
+      specializations: unknown;
+      verification_status: string | null;
       created_at: Date;
     }>(
       `
         SELECT 
-          u.id,
+          u.id AS user_id,
           u.full_name,
-          u.email,
           u.phone,
-          r.code as role_code,
+          g.city,
+          g.state,
+          g.specializations,
+          g.verification_status,
+          g.created_at
+        FROM garages g
+        INNER JOIN users u ON u.id = g.owner_user_id
+        WHERE COALESCE(g.is_approved, FALSE) = FALSE
+          AND COALESCE(g.verification_status, 'pending') = 'pending'
+        ORDER BY g.created_at DESC
+      `
+    );
+
+    const garages = garageRows.rows.map((row) => {
+      const location = [row.city, row.state].filter(Boolean).join(', ') || 'Unknown';
+      const normalizedSpecializations = Array.isArray(row.specializations)
+        ? (row.specializations as unknown[]).map((value) => String(value))
+        : ['General Service'];
+      return {
+        id: row.user_id,
+        name: row.full_name,
+        location,
+        phone: row.phone,
+        specializations: normalizedSpecializations.length > 0 ? normalizedSpecializations : ['General Service'],
+        status: row.verification_status ?? 'pending',
+        submittedAt: row.created_at.toISOString().split('T')[0],
+        documents: ['Business License', 'Insurance'],
+      };
+    });
+
+    const garageRoleUsersWithoutGarage = await query<{
+      user_id: string;
+      full_name: string;
+      phone: string;
+      created_at: Date;
+    }>(
+      `
+        SELECT
+          u.id AS user_id,
+          u.full_name,
+          u.phone,
           u.created_at
         FROM users u
         INNER JOIN user_roles ur ON ur.user_id = u.id
-        INNER JOIN roles r ON r.id = ur.role_id
-        WHERE r.code IN ('garage', 'vendor')
+        INNER JOIN roles r ON r.id = ur.role_id AND r.code = 'garage'
+        LEFT JOIN garages g ON g.owner_user_id = u.id
+        WHERE g.id IS NULL
         ORDER BY u.created_at DESC
       `
     );
 
-    const garages = rows.rows
-      .filter((row) => row.role_code === 'garage')
-      .map((row) => ({
-        id: row.id,
+    garageRoleUsersWithoutGarage.rows.forEach((row) => {
+      garages.push({
+        id: row.user_id,
         name: row.full_name,
         location: 'Unknown',
         phone: row.phone,
@@ -326,10 +369,26 @@ adminRouter.get('/approvals', async (req, res, next) => {
         status: 'pending',
         submittedAt: row.created_at.toISOString().split('T')[0],
         documents: ['Business License', 'Insurance'],
-      }));
+      });
+    });
 
-    const vendors = rows.rows
-      .filter((row) => row.role_code === 'vendor')
+    const vendorRows = await query<{
+      id: string;
+      full_name: string;
+      phone: string;
+      created_at: Date;
+    }>(
+      `
+        SELECT u.id, u.full_name, u.phone, u.created_at
+        FROM users u
+        INNER JOIN user_roles ur ON ur.user_id = u.id
+        INNER JOIN roles r ON r.id = ur.role_id
+        WHERE r.code = 'vendor'
+        ORDER BY u.created_at DESC
+      `
+    );
+
+    const vendors = vendorRows.rows
       .map((row) => ({
         id: row.id,
         name: row.full_name,
@@ -342,6 +401,106 @@ adminRouter.get('/approvals', async (req, res, next) => {
       }));
 
     return res.json({ garages, vendors });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+adminRouter.patch('/approvals/garages/:userId', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { action } = req.body as { action?: 'approve' | 'reject' };
+
+    if (action !== 'approve' && action !== 'reject') {
+      return res.status(400).json({ message: 'action must be either approve or reject' });
+    }
+
+    const verificationStatus = action === 'approve' ? 'approved' : 'rejected';
+    const isApproved = action === 'approve';
+
+    const updatedGarage = await query(
+      `
+        UPDATE garages
+        SET
+          verification_status = $1,
+          is_approved = $2,
+          updated_at = NOW()
+        WHERE owner_user_id = $3::uuid
+        RETURNING id
+      `,
+      [verificationStatus, isApproved, userId]
+    );
+
+    if (updatedGarage.rows.length === 0) {
+      const userRow = await query<{ full_name: string }>(
+        `SELECT full_name FROM users WHERE id = $1::uuid LIMIT 1`,
+        [userId]
+      );
+      if (userRow.rows.length === 0) {
+        return res.status(404).json({ message: 'Garage user not found' });
+      }
+
+      const garageColumnTypes = await query<{
+        column_name: string;
+        data_type: string;
+        udt_name: string;
+      }>(
+        `
+          SELECT column_name, data_type, udt_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'garages'
+            AND column_name IN ('specializations', 'business_hours')
+        `
+      );
+
+      const specializationsColumn = garageColumnTypes.rows.find((column) => column.column_name === 'specializations');
+      const businessHoursColumn = garageColumnTypes.rows.find((column) => column.column_name === 'business_hours');
+      const specializationsValueSql = specializationsColumn?.udt_name === '_text'
+        ? 'ARRAY[]::text[]'
+        : '\'[]\'::jsonb';
+      const businessHoursValueSql = businessHoursColumn?.data_type === 'jsonb'
+        ? '\'{}\'::jsonb'
+        : '\'{}\'';
+
+      await query(
+        `
+          INSERT INTO garages (
+            id,
+            owner_user_id,
+            business_name,
+            address_line,
+            city,
+            state,
+            postal_code,
+            specializations,
+            business_hours,
+            verification_status,
+            is_approved,
+            trust_score
+          )
+          VALUES (
+            gen_random_uuid(),
+            $1::uuid,
+            $2,
+            'N/A',
+            'N/A',
+            'N/A',
+            'N/A',
+            ${specializationsValueSql},
+            ${businessHoursValueSql},
+            $3,
+            $4,
+            0
+          )
+        `,
+        [userId, userRow.rows[0].full_name, verificationStatus, isApproved]
+      );
+    }
+
+    return res.json({
+      message: action === 'approve' ? 'Garage approved successfully' : 'Garage rejected successfully',
+    });
   } catch (error) {
     return next(error);
   }

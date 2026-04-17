@@ -28,12 +28,13 @@ paymentsRouter.get('/transactions', async (req, res, next) => {
           p.status,
           p.amount::text,
           p.method,
-          b.garage_name,
+          g.business_name as garage_name,
           v.make,
           v.model,
           v.year
         FROM payments p
         INNER JOIN bookings b ON b.id = p.booking_id
+        INNER JOIN garages g ON g.id = b.garage_id
         INNER JOIN quotes q ON q.id = b.quote_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id
@@ -108,12 +109,13 @@ paymentsRouter.post('/intent', async (req, res, next) => {
         SELECT
           b.id,
           q.total_cost::text,
-          b.garage_name,
+          g.business_name as garage_name,
           v.make,
           v.model,
           v.year
         FROM bookings b
         INNER JOIN quotes q ON q.id = b.quote_id
+        INNER JOIN garages g ON g.id = b.garage_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id
         WHERE b.id = $1 AND b.customer_user_id = $2
@@ -195,12 +197,13 @@ paymentsRouter.get('/intents/:intentId', async (req, res, next) => {
           pi.currency,
           pi.method,
           pi.status,
-          b.garage_name,
+          g.business_name as garage_name,
           v.make,
           v.model,
           v.year
         FROM payment_intents pi
         INNER JOIN bookings b ON b.id = pi.booking_id
+        INNER JOIN garages g ON g.id = b.garage_id
         INNER JOIN quotes q ON q.id = b.quote_id
         INNER JOIN issue_requests i ON i.id = q.issue_request_id
         INNER JOIN vehicles v ON v.id = i.vehicle_id

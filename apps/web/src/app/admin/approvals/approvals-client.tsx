@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Building2, CheckCircle, XCircle, Clock, FileText, ChevronLeft, ChevronRight, Search, Phone, Mail, MapPin, Calendar, User } from 'lucide-react';
-import { fetchAdminApprovals, type AdminApproval } from '@/lib/api';
+import { fetchAdminApprovals, type AdminApproval, updateGarageApprovalStatus } from '@/lib/api';
 
 export function ApprovalsClient() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,6 +22,7 @@ export function ApprovalsClient() {
   const [loading, setLoading] = useState(true);
   const [selectedGarage, setSelectedGarage] = useState<AdminApproval | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [updatingApprovalId, setUpdatingApprovalId] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -56,6 +57,23 @@ export function ApprovalsClient() {
   const handleViewDetails = (garage: AdminApproval) => {
     setSelectedGarage(garage);
     setIsDetailOpen(true);
+  };
+
+  const handleApprovalAction = async (garage: AdminApproval, action: 'approve' | 'reject') => {
+    try {
+      setUpdatingApprovalId(garage.id);
+      await updateGarageApprovalStatus(garage.id, action);
+      setGarages((prev) => prev.filter((item) => item.id !== garage.id));
+      if (selectedGarage?.id === garage.id) {
+        setIsDetailOpen(false);
+        setSelectedGarage(null);
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} garage:`, error);
+      alert(error instanceof Error ? error.message : `Failed to ${action} garage`);
+    } finally {
+      setUpdatingApprovalId(null);
+    }
   };
 
   return (
@@ -155,17 +173,21 @@ export function ApprovalsClient() {
                         variant="outline"
                         size="sm"
                         className="h-8 gap-2 text-destructive hover:bg-destructive/10 sm:h-9 sm:text-sm"
+                        onClick={() => void handleApprovalAction(garage, 'reject')}
+                        disabled={updatingApprovalId === garage.id}
                       >
                         <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                        Reject
+                        {updatingApprovalId === garage.id ? 'Updating...' : 'Reject'}
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         className="h-8 gap-2 bg-emerald-600 hover:bg-emerald-700 sm:h-9 sm:text-sm"
+                        onClick={() => void handleApprovalAction(garage, 'approve')}
+                        disabled={updatingApprovalId === garage.id}
                       >
                         <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                        Approve
+                        {updatingApprovalId === garage.id ? 'Updating...' : 'Approve'}
                       </Button>
                     </div>
                   </div>
@@ -301,11 +323,18 @@ export function ApprovalsClient() {
                   type="button"
                   variant="outline"
                   className="flex-1 text-destructive hover:bg-destructive/10"
+                  onClick={() => selectedGarage && void handleApprovalAction(selectedGarage, 'reject')}
+                  disabled={Boolean(selectedGarage && updatingApprovalId === selectedGarage.id)}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
                   Reject Registration
                 </Button>
-                <Button type="button" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                <Button
+                  type="button"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => selectedGarage && void handleApprovalAction(selectedGarage, 'approve')}
+                  disabled={Boolean(selectedGarage && updatingApprovalId === selectedGarage.id)}
+                >
                   <CheckCircle className="mr-2 h-4 w-4" />
                   Approve Registration
                 </Button>

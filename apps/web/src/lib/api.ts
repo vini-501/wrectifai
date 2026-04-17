@@ -1221,11 +1221,19 @@ export type IssueDetail = {
   createdAt: string | Date;
   vehicleLabel: string;
   issuePayload?: {
+    user?: Record<string, unknown>;
+    vehicle?: Record<string, unknown>;
+    location?: Record<string, unknown>;
+    schedule?: Record<string, unknown>;
+    serviceType?: string;
+    source?: string;
     issue?: {
       category?: string;
       severity?: string;
       description?: string;
-      answers?: Record<string, string>;
+      sinceWhen?: string;
+      symptoms?: string[];
+      answers?: Record<string, unknown>;
     };
   };
 };
@@ -1295,6 +1303,18 @@ export async function selectQuote(quoteId: string): Promise<{ bookingId?: string
   const data = (await response.json()) as { message?: string; bookingId?: string };
   if (!response.ok) throw new Error(data.message ?? 'Failed to select quote');
   return { bookingId: data.bookingId };
+}
+
+export async function cancelSelectedQuote(quoteId: string): Promise<void> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/marketplace/quotes/${encodeURIComponent(quoteId)}/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to cancel accepted quote');
 }
 
 export async function fetchUserBookings(): Promise<MockBooking[]> {
@@ -1981,4 +2001,348 @@ export async function fetchAdminApprovals(): Promise<AdminApprovalsData> {
     garages: data.garages ?? [],
     vendors: data.vendors ?? [],
   };
+}
+
+export async function updateGarageApprovalStatus(
+  userId: string,
+  action: 'approve' | 'reject'
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/admin/approvals/garages/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? `Failed to ${action} garage`);
+}
+
+// Garage API functions
+export type GarageDashboardData = {
+  totalBookings: number;
+  quotesSent: number;
+  revenue: number;
+  rating: number;
+  reviewCount: number;
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    message: string;
+    details: string;
+    time: string;
+  }>;
+  isApproved?: boolean;
+};
+
+export type GarageOrder = {
+  id: string;
+  customer: string;
+  vehicle: string;
+  issue: string;
+  diagnosis: string;
+  urgency: string;
+  status: string;
+  submitted: string;
+};
+
+export type GarageIssueDetailsResponse = {
+  issue: {
+    id: string;
+    summary: string;
+    status: string;
+    created_at: string;
+    issue_payload: any;
+    customer_name: string;
+    customer_phone: string;
+    customer_email: string | null;
+    make: string;
+    model: string;
+    year: number;
+    fuel_type: string;
+    mileage: number | null;
+    vehicle: string;
+  };
+  quotes: Array<{
+    id: string;
+    issue_request_id: string;
+    garage_id: string;
+    parts_cost: string | number;
+    labor_cost: string | number;
+    total_cost: string | number;
+    eta_note?: string | null;
+    comparison_label?: string | null;
+    status: string;
+    created_at: string;
+  }>;
+  existingQuote: {
+    id: string;
+    parts_cost: string | number;
+    labor_cost: string | number;
+    total_cost: string | number;
+    status: string;
+    created_at: string;
+  } | null;
+};
+
+export type GarageBooking = {
+  id: string;
+  customer: string;
+  vehicle: string;
+  service: string;
+  date: string;
+  time: string;
+  status: string;
+  mode: string;
+};
+
+export type GarageService = {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  description: string;
+  active: boolean;
+};
+
+export type GarageAvailability = {
+  businessHours: Array<{
+    id: string;
+    day: string;
+    startTime: string;
+    endTime: string;
+    active: boolean;
+  }>;
+  blockedDates: Array<{
+    id: string;
+    date: string;
+    reason: string;
+  }>;
+  pickupDropoff: {
+    homePickup: boolean;
+    dropoff: boolean;
+  };
+};
+
+export type GarageProfile = {
+  garageName: string;
+  email: string;
+  phone: string;
+  address: string;
+  businessHours: string;
+  description: string;
+  specializations: string[];
+  certifications: string[];
+  isApproved?: boolean;
+};
+
+export async function fetchGarageDashboard(): Promise<GarageDashboardData> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/garage/dashboard`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  );
+  const data = (await response.json()) as { message?: string } & GarageDashboardData;
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load dashboard data');
+  return data;
+}
+
+export async function fetchGarageOrders(): Promise<GarageOrder[]> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/garage/orders`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  );
+  const data = (await response.json()) as { message?: string; orders?: GarageOrder[] };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load orders');
+  return data.orders ?? [];
+}
+
+export async function fetchGarageIssueDetails(issueRequestId: string): Promise<GarageIssueDetailsResponse> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/garage/orders/${encodeURIComponent(issueRequestId)}/issue-details`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  );
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Invalid server response (${response.status}). Expected JSON.`);
+  }
+
+  const data = (await response.json()) as { message?: string } & Partial<GarageIssueDetailsResponse>;
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load issue details');
+  if (!data.issue) throw new Error('Issue details not found');
+
+  return {
+    issue: data.issue,
+    quotes: data.quotes ?? [],
+    existingQuote: data.existingQuote ?? null,
+  };
+}
+
+export async function fetchGarageBookings(): Promise<GarageBooking[]> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/garage/bookings`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  );
+  const data = (await response.json()) as { message?: string; bookings?: GarageBooking[] };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load bookings');
+  return data.bookings ?? [];
+}
+
+export async function fetchGarageServices(): Promise<GarageService[]> {
+  const response = await withSessionRefreshRetry(() =>
+    fetch(`${API_BASE_URL}/garage/services`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  );
+  const data = (await response.json()) as { message?: string; services?: GarageService[] };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load services');
+  return data.services ?? [];
+}
+
+export async function createGarageService(name: string, category: string, price: number, description?: string): Promise<GarageService> {
+  const response = await fetch(`${API_BASE_URL}/garage/services`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, category, price, description }),
+  });
+  const data = (await response.json()) as { message?: string; service?: GarageService };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to create service');
+  if (!data.service) throw new Error('Failed to create service');
+  return data.service;
+}
+
+export async function updateGarageService(serviceId: string, name?: string, category?: string, price?: number, description?: string, active?: boolean): Promise<GarageService> {
+  const response = await fetch(`${API_BASE_URL}/garage/services/${serviceId}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, category, price, description, active }),
+  });
+  const data = (await response.json()) as { message?: string; service?: GarageService };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to update service');
+  if (!data.service) throw new Error('Failed to update service');
+  return data.service;
+}
+
+export async function deleteGarageService(serviceId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/garage/services/${serviceId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok && response.status !== 204) throw new Error(data.message ?? 'Failed to delete service');
+}
+
+export async function fetchGarageAvailability(): Promise<GarageAvailability> {
+  const response = await fetch(`${API_BASE_URL}/garage/availability`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const data = (await response.json()) as { message?: string } & GarageAvailability;
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load availability');
+  return data;
+}
+
+export async function fetchGarageProfile(): Promise<GarageProfile> {
+  const response = await fetch(`${API_BASE_URL}/garage/profile`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const data = (await response.json()) as { message?: string } & GarageProfile;
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load profile');
+  return data;
+}
+
+export async function updateGarageProfile(profile: GarageProfile): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/garage/profile`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  });
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to update profile');
+}
+
+export async function submitGarageQuote(issueRequestId: string, partsCost: number, laborCost: number, description?: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/garage/orders/${issueRequestId}/quotes`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parts_cost: partsCost, labor_cost: laborCost, description }),
+  });
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to submit quote');
+}
+
+// User quotes API functions
+export type Quote = {
+  id: string;
+  issue_request_id: string;
+  garage_name: string;
+  garage_rating?: number;
+  distance_miles?: number;
+  parts_cost: number;
+  labor_cost: number;
+  total_cost: number;
+  comparison_label?: 'below' | 'fair' | 'above';
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+};
+
+export type IssueRequestWithQuotes = {
+  id: string;
+  customer_user_id: string;
+  vehicle_id: string;
+  summary: string;
+  status: string;
+  created_at: string;
+  quotes: Quote[];
+  vehicle_label?: string;
+};
+
+export async function fetchIssueRequestsWithQuotes(): Promise<IssueRequestWithQuotes[]> {
+  const response = await fetch(`${API_BASE_URL}/users/issue-requests-with-quotes`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const data = (await response.json()) as { message?: string; issue_requests?: IssueRequestWithQuotes[] };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to load issue requests with quotes');
+  const issueRequests = data.issue_requests ?? [];
+  return issueRequests.map((issue) => ({
+    ...issue,
+    quotes: (issue.quotes ?? []).map((quote) => ({
+      ...quote,
+      garage_rating:
+        quote.garage_rating === undefined || quote.garage_rating === null
+          ? undefined
+          : Number(quote.garage_rating),
+      distance_miles:
+        quote.distance_miles === undefined || quote.distance_miles === null
+          ? undefined
+          : Number(quote.distance_miles),
+      parts_cost: Number(quote.parts_cost),
+      labor_cost: Number(quote.labor_cost),
+      total_cost: Number(quote.total_cost),
+    })),
+  }));
+}
+
+export async function acceptQuote(quoteId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/users/quotes/${quoteId}/accept`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const data = (await response.json()) as { message?: string };
+  if (!response.ok) throw new Error(data.message ?? 'Failed to accept quote');
 }
