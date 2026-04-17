@@ -2,7 +2,11 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const nxCliPath = resolve('node_modules', 'nx', 'bin', 'nx.js');
-const args = ['run-many', '-t', 'build', '-p', 'api,web', ...process.argv.slice(2)];
+const cliArgs = process.argv.slice(2);
+const projectArgs = cliArgs.filter((arg) => !arg.startsWith('-'));
+const extraArgs = cliArgs.filter((arg) => arg.startsWith('-'));
+const projects = projectArgs.length > 0 ? projectArgs.join(',') : 'api,web';
+const args = ['run-many', '-t', 'build', '-p', projects, ...extraArgs];
 
 const child = spawn(process.execPath, [nxCliPath, ...args], {
   stdio: 'inherit',
