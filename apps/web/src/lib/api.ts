@@ -1897,6 +1897,7 @@ export type AdminPayment = {
   status: string;
   date: string;
   method: string;
+  receiptNumber: string;
 };
 
 export type AdminComplaint = {
